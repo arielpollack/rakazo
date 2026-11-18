@@ -163,7 +163,7 @@ struct MarketDirectory {
   static func sample(_ library: SampleIntegrations, seed: CatalogSeed) -> Self {
     var figma = MarketPlugin(
       id: "sample-figma", displayName: "Figma", description: brands["figma"]!.summary,
-      source: "sample:figma", installedSource: "sample:figma", category: "Design",
+      source: IntegrationFixtures.repo("Figma"), installedSource: IntegrationFixtures.repo("Figma"), category: "Design",
       domains: ["figma.com"])
     figma.hasConnector = true; figma.skillCount = 2
     let additions = IntegrationFixtures.repositories.filter { $0 != "Figma" }.map { title in

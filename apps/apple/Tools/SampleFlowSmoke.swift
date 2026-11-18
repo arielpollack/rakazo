@@ -12,12 +12,15 @@ import Foundation
     legacy.transcripts.removeValue(forKey: Sample.integrationTour)
     legacy.computers = nil
     legacy.integrations = nil
+    legacy.integrationRecords = nil
+    legacy.spaceSkills = nil
     var restored = try JSONDecoder().decode(Sample.self, from: JSONEncoder().encode(legacy))
     restored.includeWalkthrough()
     restored.includeWalkthrough()
     precondition(restored.spaces[0].bots.filter { $0.id == Sample.computerTour }.count == 1)
     let store = WorkspaceStore(sample: restored, persistent: false)
     let entries = store.sampleIntegrations!.catalog(catalog)
+    try await checkManagement(seed: catalog)
     precondition(entries.count == 6 && entries.filter(\.connected).count == 2)
     precondition(catalog.apps.first { $0.slug == "gmail" }?.tools.count == 6)
     precondition(
@@ -38,7 +41,7 @@ import Foundation
       $0.connect(app)
     }
     store.resolveSampleConnection(chat: tour, message: appMessage, kind: "app_connect", allow: true)
-    precondition(card(appMessage) == "connected" && store.sampleIntegrations!.accounts.count == 3)
+    precondition(card(appMessage) == "connected" && store.sampleIntegrations!.accounts.count == 4)
     store.resolveSampleConnection(
       chat: tour, message: mcpMessage, kind: "mcp_approval", allow: true)
     store.resolveSampleConnection(
@@ -48,7 +51,7 @@ import Foundation
         && store.sampleIntegrations!.assignments["linear.app"]!.contains(tour))
     precondition(
       store.sampleIntegrations!.servers.map(\.connectionLabel) == [
-        "Connected", "Not working", "Sign in again", "Installing",
+        "Connected", "Not working", "Sign in again", "Installing", "Sign in again",
       ])
     let source = catalog.sources.first { $0.domain == "figma.com" }!
     store.changeIntegrations {
@@ -57,7 +60,7 @@ import Foundation
       $0.accounts.removeAll { $0.provider == "slack" }
     }
     precondition(
-      store.sampleIntegrations!.servers.count == 5
+      store.sampleIntegrations!.servers.count == 6
         && !store.sampleIntegrations!.catalog(catalog).first { $0.slug == "slack" }!.connected)
     let bot = Sample.computerTour
     let first = UUID()
@@ -130,10 +133,56 @@ import Foundation
     let persisted = try JSONDecoder().decode(Sample.self, from: JSONEncoder().encode(store.sample!))
     let reopened = WorkspaceStore(sample: persisted, persistent: false)
     precondition(
-      reopened.sampleLeases.isEmpty && reopened.sampleIntegrations!.servers.count == 5
+      reopened.sampleLeases.isEmpty && reopened.sampleIntegrations!.servers.count == 6
         && reopened.sample!.computers![bot]!.document == "Ship draft")
     print(
       "PASS: offline catalog, account/card grants, MCP states, workspace isolation, host consent, screen leases, run-scoped handback, skip and persistence"
     )
+  }
+
+  @MainActor static func checkManagement(seed: CatalogSeed) async throws {
+    func expect(_ value: Bool, _ message: String) throws { if !value { throw Failure(message) } }
+    let store = WorkspaceStore(sample: .initial, persistent: false)
+    let gmail = store.sampleIntegrations!.catalog(seed).first { $0.slug == "gmail" }!
+    let mailboxes = try await store.linkedAccounts(gmail)
+    try expect(mailboxes.count == 2, "Expected independent accounts.")
+    try await store.renameAccount(mailboxes[0], to: "Team updates")
+    try expect(try await store.linkedAccounts(gmail).first?.displayName == "Team updates", "Account rename was lost.")
+    try await store.revokeAccount(mailboxes[0]); try expect(try await store.linkedAccounts(gmail).map(\.id) == [mailboxes[1].id], "Disconnected the wrong account.")
+    let brain = try await store.managedServers().first { $0.id == "sample-brain" }!
+    try expect(try await store.testServer(brain).health.status == "error", "Expired authorization unexpectedly succeeded.")
+    let pending: Void? = try? await store.verifyBrowserGrant(brain.id)
+    try expect(pending == nil, "Browser sign-in was accepted before the server confirmed it.")
+    store.completeSampleGrant(brain)
+    try await store.verifyBrowserGrant(brain.id)
+    let signed = try await store.managedServers().first { $0.id == brain.id }!
+    try expect(try await store.testServer(signed).health.toolCount == 7, "Reconnected server did not discover tools.")
+    let successful = URL(string: "rakazo://mcp-oauth?code=fixture&state=expected")!
+    try expect(try WorkspaceStore.oauthCompletion(successful, sessionID: "expected")["code"] == "fixture", "Callback was not accepted.")
+    for invalid in ["rakazo://other?code=fixture&state=expected", "rakazo://mcp-oauth?code=fixture&state=stale", "rakazo://mcp-oauth?error=access_denied&state=expected", "rakazo://mcp-oauth?code=one&code=two&state=expected"] {
+      try expect((try? WorkspaceStore.oauthCompletion(URL(string: invalid)!, sessionID: "expected")) == nil, "Accepted an invalid callback.")
+    }
+    let source = IntegrationFixtures.repo("Linear"); let preview = try await store.previewRepository(source)
+    func plugin() async throws -> ManagedInstall? { try await store.managementInstalls().first { $0.source == source } }
+    try await store.setPlugin(try await plugin(), preview: preview, source: source, parts: ["connector", "skills"])
+    guard let packaged = try await store.managementSkills().first(where: { $0.parentID == source }) else { throw Failure("Installed skills did not enter the library.") }
+    try expect(!packaged.editable, "Packaged skill was editable.")
+    let denied = try? await store.writeSkill(packaged, name: "Rewrite", description: "Read only", body: "Fixture"); try expect(denied == nil, "Writable plugin skill.")
+    try await store.setPlugin(try await plugin(), preview: preview, source: source, parts: ["connector"])
+    try expect(try await !store.managementSkills().contains { $0.parentID == source }, "Removed skills remain visible.")
+    try expect(try await store.managedServers().contains { $0.installId == source }, "Removing skills removed the connector.")
+    try await store.setPlugin(try await plugin(), preview: preview, source: source, parts: [])
+    try expect(try await plugin() == nil, "Plugin was not removed.")
+    let custom = try await store.addSource(kind: "graphql", name: "Reports", url: "https://reports.example/graphql", method: "header", header: "X-Reports", credential: "not-persisted-fixture")
+    try await store.setScope(kind: "install", id: custom.id, scope: .here(store.currentSpace))
+    let scoped = try await store.managementInstalls().first { $0.id == custom.id }!
+    let replacement = try await store.addSource(kind: "graphql", name: "New reports", url: "https://reports.example/v2", method: "none", header: "", credential: "", replacing: scoped)
+    try expect(replacement.id == custom.id && replacement.availability?.allSpaces == false, "Replacement widened access.")
+    let serialized = try JSONEncoder().encode(store.sample!); try expect(!String(decoding: serialized, as: UTF8.self).contains("not-persisted-fixture"), "Fixture stored a credential value.")
+    let home = store.currentSpace, other = try await store.createPrivateSpace(name: "Isolated")
+    try await store.openPrivateSpace(other); try expect(try await !store.managementInstalls().contains { $0.id == replacement.id }, "Unexpected cross-space access.")
+    try await store.openPrivateSpace(home); try await store.removeSource(replacement)
+    try expect(try await !store.managementInstalls().contains { $0.id == replacement.id }, "Custom source was not removed.")
+    print("PASS: independent accounts, reconnect and callback validation, independent plugin parts, read-only skills, scoped replacement, credential redaction and removal.")
   }
 }

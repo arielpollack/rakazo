@@ -62,7 +62,7 @@ import Foundation
     try await reopened.openPrivateSpace(id)
     let target = reopened.sampleIntegrations!
     precondition(target.servers.map(\.name) == ["Linear"] && target.servers[0].allBots == false)
-    precondition(target.installedPlugins == ["sample:figma"] && target.assignments.isEmpty && target.accounts.isEmpty)
+    precondition(target.installedPlugins == ["sample:figma", IntegrationFixtures.repo("Linear")] && target.assignments.isEmpty && target.accounts.isEmpty)
     let skill = restored.accountTools.first { $0.kind == "skill" }!
     precondition(!skill.availability.allSpaces && skill.availability.spaceIds == ["local"])
     print("PASS: name limits, duplicate submission, retry at every step, typed identities, defaults, independent scopes and persisted choices.")

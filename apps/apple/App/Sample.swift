@@ -59,11 +59,11 @@ struct Sample: Codable {
     return sample
   }
   mutating func includeWalkthrough() {
-    if integrationRecords == nil { seedIntegrationManagement() }
     if spaceSkills == nil {
       spaceSkills = [.init(kind: "skill", id: "sample-release-notes", name: "Release notes",
         availability: .init(allSpaces: true, spaceIds: ["local"]))]
     }
+    if integrationRecords == nil { seedIntegrationManagement() }
     includeFeatureTours()
     let id = "sample-agent-walkthrough"
     guard let index = spaces.firstIndex(where: { $0.id == "local" }),

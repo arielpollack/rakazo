@@ -14,8 +14,10 @@ A SwiftUI client for an existing Rakazo server. One multiplatform target builds 
 
 | Start in the sample workspace | What to try |
 | --- | --- |
-| **Mac: Connect apps → Discover** | Click **Connect Slack** on its card, then **Approve sample**. Cancel leaves it available. Expand **Sample outcomes** to simulate a failure and retry. The name and chevron open details instead. Figma and Asana have separate install and server-setup reviews. |
-| **Mac: My integrations · iOS: Connect apps → Apps** | Open **Team inbox** to inspect Gmail tools. Rename or disconnect a sample account. Canceling sample authorization does not create an account. |
+| **Mac: Connect apps → Discover** | Click **Connect Slack** on its card, then **Start sample authorization → Check connection**. Cancel leaves it unconnected. Click elsewhere on a card for details. |
+| **Mac: Apps → Gmail** | Review available tools and both sample accounts. Rename or disconnect one, or review the named accounts before disconnecting Gmail. |
+| **Mac: My integrations → Agentic Brain** | Edit its connection, credentials and advanced settings; save and reopen. Reconnect, test, choose individual bot tools, or remove after confirmation. |
+| **Mac: Plugins · Skills · +** | Open Linear and add or remove its skills separately from its connector. Write a skill, read a packaged skill, or use **+** to import a repository or configure a custom source. |
 | **Connect apps → MCP servers** | Open **Linear**, choose which bots can use it and save. Inspect GitHub’s error, Notion’s sign-in requirement and Files’ installation state. Add a server from the public catalog. |
 | **Integrations walkthrough** | Review Slack’s connection request from chat. Approve or dismiss the bot’s request to use Linear; its grant is visible under **Agent access**. |
 | **Computer walkthrough → Review bot screen…** | Opening the screen only watches. **Take control**, change the checklist title or mark it reviewed, then **I’m done**. The bot reports what you changed. Closing without finishing releases control but leaves the request pending. **Profile → Computer → View bot screen** lets you request another review. |
@@ -73,12 +75,13 @@ swiftc App/Models.swift App/Connection.swift Tools/ServerSmoke.swift -o .build/s
 ./Tools/with-upstream.sh .build/server-smoke
 
 # Offline tests: no account, provider, Docker, device input or mounted environment file.
-swiftc App/{Models,Connection,Sample,SampleComputer,IntegrationLibrary,WorkspaceStore,PrivateSpace}.swift \
+core=(App/{Models,Connection,Sample,SampleComputer,IntegrationLibrary,WorkspaceStore,PrivateSpace,MarketplaceCatalog,ManagedIntegrations,ManagedServers}.swift)
+swiftc "${core[@]}" \
   Tools/SampleFlowSmoke.swift -o .build/sample-smoke
 .build/sample-smoke App/sample-catalog.json
 
 # Space creation, retry and selection: offline, then saved choices on the real local release.
-swiftc App/{Models,Connection,Sample,SampleComputer,IntegrationLibrary,WorkspaceStore,PrivateSpace}.swift \
+swiftc "${core[@]}" \
   Tools/PrivateSpaceSmoke.swift -o .build/private-space-smoke
 .build/private-space-smoke
 ./Tools/with-upstream.sh .build/private-space-smoke --release-server
@@ -91,7 +94,7 @@ swiftc -whole-module-optimization ${files:#App/RakazoApp.swift} Tools/MarketRend
 "$out/market-render" "$out"
 
 # Real release API, disposable account: read the marketplace and verify MCP grant and revoke.
-swiftc App/{Models,Connection,Sample,SampleComputer,IntegrationLibrary,WorkspaceStore,PrivateSpace,MarketplaceCatalog}.swift \
+swiftc "${core[@]}" \
   Tools/IntegrationServerSmoke.swift -o .build/integration-server-smoke
 ./Tools/with-upstream.sh .build/integration-server-smoke
 

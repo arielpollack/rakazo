@@ -1,5 +1,6 @@
 #if os(macOS)
   import SwiftUI
+  import AuthenticationServices
 
   private struct MarketPluginPreview: Decodable {
     struct Skill: Decodable { let name: String, description: String }
@@ -13,14 +14,15 @@
     @ObservedObject var store: WorkspaceStore
     let item: MarketItem, onFailure: (String?) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.webAuthenticationSession) private var browser
     @Environment(\.openURL) private var openURL
+    @State private var browserURL: URL?
     @State private var preview: MarketPluginPreview?
     @State private var parts = Set<String>()
     @State private var problem: String?
     @State private var busy = false
     @State private var loading = false
     @State private var savedID: String?
-    @State private var signInURL: URL?
     @State private var credential = ""
     @State private var createdHere = false
     @State private var slug = "integration-" + UUID().uuidString.prefix(8).lowercased()
@@ -90,6 +92,7 @@
                 Text(
                   "Review and approve access in your browser. Adding the server does not assign it to a bot."
                 ).foregroundStyle(.secondary)
+                if let browserURL { Link("Reopen sign-in", destination: browserURL) }
               } else if needsCredential && (!hasServer || source.auth == "bearer" || createdHere) {
                 SecureField(
                   source.auth == "header" ? (source.headerName ?? "API key") : "Bearer token",
@@ -104,7 +107,6 @@
                   "After adding the server, manage its status and bot access in My integrations."
                 ).foregroundStyle(.secondary)
               }
-              if let signInURL { Link("Reopen provider sign-in", destination: signInURL) }
             }
             if let problem {
               Problem(text: problem)
@@ -120,7 +122,7 @@
           Button(savedID == nil ? "Cancel" : "Close") { dismiss() }.keyboardShortcut(.cancelAction)
             .disabled(busy)
           Button(
-            signInURL != nil
+            browserURL != nil
               ? "Check connection"
               : savedID != nil
                 ? "Retry setup"
@@ -226,24 +228,15 @@
               }
               credential = ""
             }
-            if source.auth == "oauth" && signInURL == nil {
-              struct Reply: Decodable { let status: String, authorizationUrl: String? }
-              let result: Reply = try await api.rpc("mcp/oauth/begin", ["serverId": savedID])
-              if result.status == "authorization_required" {
-                guard let url = MarketDirectory.secureURL(result.authorizationUrl) else {
-                  throw Failure("The provider did not return a secure sign-in link.")
-                }
-                signInURL = url
+            if source.auth == "oauth" {
+              if browserURL != nil {
+                try await store.verifyBrowserGrant(savedID)
+              } else if case .finishInBrowser(let url) = try await store.authorizeServer(
+                savedID, using: { try await mcpBrowserCallback($0, via: browser) })
+              {
+                browserURL = url
                 openURL(url)
                 return
-              }
-              guard ["already_connected", "authorization_not_requested"].contains(result.status)
-              else { throw Failure("The server did not confirm its authorization status.") }
-            }
-            if signInURL != nil {
-              let latest: [ToolServer] = try await api.rpc("mcp/servers/list")
-              guard latest.first(where: { $0.id == savedID })?.oauthStatus == "connected" else {
-                throw Failure("Sign-in isn’t complete. Finish in your browser, then check again.")
               }
             }
             let tested: ToolServer = try await api.rpc("mcp/servers/test", ["id": savedID])
