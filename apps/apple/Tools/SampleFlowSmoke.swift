@@ -120,7 +120,8 @@ import Foundation
       other.sample!.computers![bot]!.localResult == nil
         && other.sampleIntegrations!.assignments["linear.app"]!.contains(tour) == false)
     precondition(store.sampleTakeover(bot: bot, viewer: first, run: nil))
-    try await store.create(name: "Empty space", description: "", members: nil, privateSpace: true)
+    let emptyID = try await store.createPrivateSpace(name: "Empty space")
+    try await store.openPrivateSpace(emptyID)
     precondition(store.sampleLeases.isEmpty)
     precondition(
       store.sampleIntegrations!.accounts.isEmpty && store.sampleIntegrations!.servers.isEmpty

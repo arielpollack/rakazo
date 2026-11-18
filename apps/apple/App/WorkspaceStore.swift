@@ -202,19 +202,12 @@ import Foundation
     }
   }
   func draftKey(_ chat: Chat) -> String { "\(navigation?.current.id ?? "")/\(chat.id)" }
-  func create(name: String, description: String, members: [String]?, privateSpace: Bool)
+  func create(name: String, description: String, members: [String]?)
     async throws
   {
     guard let space = navigation?.current.id else { return }
     if var local = sample, let index = local.spaces.firstIndex(where: { $0.id == space }) {
       let id = UUID().uuidString
-      if privateSpace {
-        local.spaces.append(.init(id: id, name: name, bots: [], groups: [], botSections: []))
-        sample = local
-        useSampleSpace(id)
-        selected = nil
-        return
-      }
       let chat = Chat(
         id: id, name: name, color: "#2A92FE", description: description,
         updatedAt: Date.now.ISO8601Format(), members: members?.map { Chat.Member(botId: $0) })
@@ -227,11 +220,6 @@ import Foundation
       useSampleSpace(space)
       selected = id
     } else if let api = client {
-      if privateSpace {
-        let created: ObjectID = try await api.rpc("spaces/create", ["name": name])
-        try await load(space: created.id)
-        return
-      }
       let created: ObjectID
       if let members {
         created = try await api.rpc("groups/create", ["name": name, "botIds": members])

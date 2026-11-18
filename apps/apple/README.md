@@ -40,6 +40,8 @@ Rakazo Desktop 0.12.0 is the reference for the product and its visual identity. 
 
 **⌘K opens a modal command menu over the workspace**, including from the composer. Type to find conversations, pages (connected servers), or actions. Use ↑/↓ and Return to choose, or Escape to dismiss without changing the draft. The visible sidebar search is separate and still searches message history. Without a keyboard, use **Command menu** in the workspace menu.
 
+To try the private-space flow, choose **⌘K → New private space**, enter a name and press Return. If there are tools to choose from, select what the new space can use and choose **Continue**. Only tools available in all spaces start checked; with no eligible tools, the new space opens immediately. On Mac the name sheet fits its content, and only a long list of tools scrolls.
+
 On Mac, drag the floating panel’s outside edge to resize it or double-click to reset. In a narrow window it opens over the chat; selecting a conversation or clicking outside dismisses it. Use `⌘B` for the sidebar, `⌘N` for a new bot, `⌘1`–`⌘9` to choose a chat, and `⌘,` for Settings. Conversation details open in an inspector when there is room and in a content-fitting sheet otherwise. On a wide iPad, drag the sidebar grip or double-tap to reset it. iPhone and narrow iPad windows use a navigation stack with the system back gesture.
 
 `App/Design.swift` defines the layout and semantic colors. Your bubbles and the enabled Send button take the selected bot’s color with white text in both appearances, following [Rakazo’s shared color rule](../../packages/core/src/avatars/bot-avatar-colors.ts). Groups, photo avatars and white bots use the neutral theme colors. Increase Contrast deepens bright accents further. Bot replies and sidebar selections stay neutral. iOS uses Dynamic Type; sidebar motion respects Reduce Motion and VoiceOver can adjust its width.
@@ -71,9 +73,15 @@ swiftc App/Models.swift App/Connection.swift Tools/ServerSmoke.swift -o .build/s
 ./Tools/with-upstream.sh .build/server-smoke
 
 # Offline tests: no account, provider, Docker, device input or mounted environment file.
-swiftc App/{Models,Connection,Sample,SampleComputer,IntegrationLibrary,WorkspaceStore}.swift \
+swiftc App/{Models,Connection,Sample,SampleComputer,IntegrationLibrary,WorkspaceStore,PrivateSpace}.swift \
   Tools/SampleFlowSmoke.swift -o .build/sample-smoke
 .build/sample-smoke App/sample-catalog.json
+
+# Space creation, retry and selection: offline, then saved choices on the real local release.
+swiftc App/{Models,Connection,Sample,SampleComputer,IntegrationLibrary,WorkspaceStore,PrivateSpace}.swift \
+  Tools/PrivateSpaceSmoke.swift -o .build/private-space-smoke
+.build/private-space-smoke
+./Tools/with-upstream.sh .build/private-space-smoke --release-server
 
 # Native Mac layout and quick-connect state checks; zsh, no visible windows or desktop input.
 out=.build/marketplace/native; mkdir -p "$out"; cp App/sample-catalog.json "$out/"
@@ -83,15 +91,16 @@ swiftc -whole-module-optimization ${files:#App/RakazoApp.swift} Tools/MarketRend
 "$out/market-render" "$out"
 
 # Real release API, disposable account: read the marketplace and verify MCP grant and revoke.
-swiftc App/{Models,Connection,Sample,SampleComputer,IntegrationLibrary,WorkspaceStore,MarketplaceCatalog}.swift \
+swiftc App/{Models,Connection,Sample,SampleComputer,IntegrationLibrary,WorkspaceStore,PrivateSpace,MarketplaceCatalog}.swift \
   Tools/IntegrationServerSmoke.swift -o .build/integration-server-smoke
 ./Tools/with-upstream.sh .build/integration-server-smoke
 
-# The three feature journeys on a disposable simulator; substitute its UUID.
+# Sample feature journeys on a disposable simulator; substitute its UUID.
 xcodebuild -scheme RakazoNative -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
   -only-testing:RakazoUITests/WorkspaceTests/testSampleConnectionsAndServerAccess \
   -only-testing:RakazoUITests/WorkspaceTests/testSampleComputerTakeoverAndHostConsent \
   -only-testing:RakazoUITests/WorkspaceTests/testSampleConnectionRequestsFromChat \
+  -only-testing:RakazoUITests/WorkspaceTests/testPrivateSpaceCancelCreateAndSelectTools \
   -parallel-testing-enabled NO test
 ```
 

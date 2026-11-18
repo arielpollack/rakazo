@@ -27,6 +27,24 @@ final class MacWorkspaceTests: XCTestCase {
     add(attachment)
   }
 
+  func testPrivateSpaceSheetFitsAndOpensChosenSpace() throws {
+    let app = launch()
+    app.typeKey("k", modifierFlags: .command)
+    app.textFields["command-query"].typeText("New private space")
+    app.typeKey(.return, modifierFlags: [])
+    let field = app.textFields["newName"], sheet = app.sheets.firstMatch
+    XCTAssertTrue(field.waitForExistence(timeout: 5))
+    XCTAssertLessThan(sheet.frame.height, 255)
+    XCTAssertFalse(app.buttons["createSubmit"].isEnabled)
+    app.typeText("Studio QA")
+    app.typeKey(.return, modifierFlags: [])
+    let choice = element(app, "space-tool-mcpServer-linear.app")
+    XCTAssertTrue(choice.waitForExistence(timeout: 5))
+    XCTAssertTrue(sheet.frame.contains(app.buttons["spaceContinue"].frame))
+    choice.click(); app.buttons["spaceContinue"].click()
+    XCTAssertTrue(app.buttons["Studio QA, switch workspace"].waitForExistence(timeout: 5))
+  }
+
   func testPaletteAndSidebarPreserveConversationDraft() throws {
     let app = launch()
     let chief = app.buttons["chat-Chief"].firstMatch

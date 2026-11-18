@@ -87,11 +87,16 @@ struct Shell: View {
       ) { panel in
         Group {
           switch panel {
-          case .bot, .group, .space:
+          case .space:
+            PrivateSpaceSheet(store: store, listHeightLimit: min(320, max(64, geometry.size.height - 220))) {
+              phoneChat = false
+              modal = nil
+            }
+          case .bot, .group:
             CreateForm(
               store: store, kind: panel,
               finished: {
-                openChatAfterDismissal = panel != .space
+                openChatAfterDismissal = true
                 modal = nil
               })
           case .profile:
@@ -174,8 +179,9 @@ struct Shell: View {
         }
         #if os(macOS)
         .formStyle(.grouped)
-        .frame(width: min(panel == .apps ? 1040 : panel == .palette ? 560 : 500, geometry.size.width - 32),
-               height: panel == .profile ? nil : min(panel == .apps ? 702 : panel == .palette ? 440 : 490, geometry.size.height - 64))
+        .frame(width: min(panel == .space ? 408 : panel == .apps ? 1040 : panel == .palette ? 560 : 500, geometry.size.width - 32),
+               height: panel == .space || panel == .profile ? nil : min(panel == .apps ? 702 : panel == .palette ? 440 : 490, geometry.size.height - 64))
+        .fitPrivateSpaceSheet(panel == .space)
         #else
         .presentationDragIndicator(compact ? .visible : .automatic)
         #endif

@@ -67,20 +67,11 @@
         ) { sheet in
           Group {
             switch sheet {
-            case .account(let account): ConnectionDetails(store: store, account: account)
-            case .access(let server): ServerAccessView(store: store, server: server)
+            case .management(let route): MacManagement(route, store: store, directory: directory)
             case .start(let item):
-              if case .app(let entry, _) = item.content, let api = store.client {
-                ConnectorAuthorization(
-                  api: api, provider: entry.slug, connector: entry.connectorId,
-                  name: entry.name, origin: nil, startOnPresentation: true,
-                  onFailure: { flow.report($0, for: item) })
-              } else {
-                MarketInstallReview(
-                  store: store, item: item, onFailure: { flow.report($0, for: item) })
-              }
+              MarketInstallReview(store: store, item: item, onFailure: { flow.report($0, for: item) }).frame(width: 460, height: 350)
             }
-          }.formStyle(.grouped).frame(width: 460, height: 390)
+          }
         }
     }
 
@@ -96,6 +87,7 @@
         railButton(.apps)
         railButton(.servers)
         railButton(.plugins)
+        Button { setup = .management(.skills) } label: { Label("Skills", systemImage: "book.closed").padding(8).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle()) }.buttonStyle(.plain)
         Spacer()
       }.padding(.horizontal, 12).padding(.vertical, 24).frame(
         maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading
@@ -165,6 +157,7 @@
               ForEach(MarketCollection.allCases, id: \.self) { tab in
                 Button(tab.title) { choose(tab) }
               }
+              Button("Skills") { setup = .management(.skills) }
             } label: {
               Image(systemName: "sidebar.left")
             }.menuStyle(.borderlessButton).fixedSize().accessibilityLabel("Collections")
@@ -172,6 +165,7 @@
           Text(collection.title).font(.system(size: wide ? 28 : 23, weight: .medium)).lineLimit(1)
           Spacer(minLength: 4)
           searchBox
+          Button { setup = .management(.custom) } label: { Image(systemName: "plus") }.help("Add custom integration").accessibilityLabel("Add custom integration")
           closeButton
         }.padding(.horizontal, inset).padding(.vertical, wide ? 22 : 15)
         ScrollView {
@@ -294,7 +288,7 @@
               return false
             }
             Button {
-              setup = .account(account)
+              if let entry { show(entry) } else { setup = .management(.account(.init(connectorId: account.connectorId, name: account.provider, slug: account.provider, connected: true, noAuth: false), account)) }
             } label: {
               HStack {
                 MarketMark(
@@ -322,7 +316,7 @@
               ForEach(group) { item in
                 Button {
                   if case .server(_, let server?) = item.content {
-                    setup = .access(server)
+                    setup = .management(.server(server))
                   } else {
                     show(item)
                   }
@@ -346,6 +340,13 @@
               }
             }.overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(MarketStyle.line) }
           }
+        }
+        ForEach(directory.installs.filter { install in
+          (search.isEmpty || install.name.localizedCaseInsensitiveContains(search)) && (["api", "graphql", "mcp"].contains(install.kind) || (install.kind == "plugin" && !directory.items.contains { item in if case .plugin(let plugin, _) = item.content { return plugin.installedSource == install.source }; return false }))
+        }) { install in
+          Button { setup = .management(install.kind == "plugin" ? .plugin(install.source, install.source, install.name, false) : .source(install)) } label: {
+            ManageRow(install.name, install.kind == "api" ? "Custom source · OpenAPI" : install.kind.capitalized) { Image(systemName: "chevron.right") }.padding(12).background(MarketStyle.tint, in: RoundedRectangle(cornerRadius: 8)).contentShape(Rectangle())
+          }.buttonStyle(.plain)
         }
       }
     }
@@ -381,11 +382,11 @@
             ).disabled(refreshing || problem != nil)
             if let failure = flow.failures[item.id] { Problem(text: failure) }
             if case .server(_, let server?) = item.content {
-              Button("Manage server and bot access") { setup = .access(server) }
+              Button("Manage server and bot access") { setup = .management(.server(server)) }
             }
-            if case .app(_, let accounts) = item.content {
+            if case .app(let entry, let accounts) = item.content {
               ForEach(accounts) { account in
-                Button("Manage \(account.displayName)") { setup = .account(account) }
+                Button("Manage \(account.displayName)") { setup = .management(.account(entry, account)) }
               }
             }
             if item.confirmed == nil {
@@ -399,21 +400,31 @@
       }.background(MarketStyle.canvas)
     }
     private func show(_ item: MarketItem) {
-      detailID = item.id
-      focus = .back
+      switch item.content {
+      case .server(_, let server?): setup = .management(.server(server))
+      case .plugin(let plugin, _): setup = .management(.plugin(plugin.source, plugin.installedSource, plugin.displayName, false))
+      case .app(let entry, _): setup = .management(.app(entry))
+      default: detailID = item.id; focus = .back
+      }
     }
     private func start(_ item: MarketItem) {
       guard setup == nil, !refreshing, problem == nil, flow.begin(item) else { return }
       returnFocus = .action(item.id)
-      setup = .start(item)
+      switch item.content {
+      case .app(let entry, _): setup = .management(.authorize(entry))
+      case .plugin(let plugin, _): setup = .management(.plugin(plugin.source, plugin.installedSource, plugin.displayName, true))
+      case .server(_, let server?): setup = .management(.server(server))
+      default: setup = .start(item)
+      }
     }
     private func refresh() async {
       do {
-        let result: MarketDirectory
+        var result: MarketDirectory
         if let api = store.client {
           result = try await .load(api)
         } else if let library = store.sampleIntegrations {
           result = try .sample(library, seed: CatalogSeed.bundled.get())
+          result.installs = try await store.managementInstalls()
         } else {
           throw Failure("Choose a workspace to browse integrations.")
         }
@@ -448,13 +459,11 @@
 
   enum MarketSheet: Identifiable {
     case start(MarketItem)
-    case account(LinkedApp)
-    case access(ToolServer)
+    case management(ManageRoute)
     var id: String {
       switch self {
       case .start(let item): return item.id
-      case .account(let account): return "account:" + account.id
-      case .access(let server): return "access:" + server.id
+      case .management: return "management"
       }
     }
   }

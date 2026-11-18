@@ -14,6 +14,7 @@ struct MarketPlugin: Decodable {
   let id: String, displayName: String, description: String, source: String, installedSource: String
   let category: String?, domains: [String]
   var logo: String? = nil
+  var name: String?, hasConnector: Bool?, skillCount: Int?
 }
 
 struct MarketSource {
@@ -100,6 +101,8 @@ struct MarketItem: Identifiable {
     case .app(let entry, _): library.connect(entry)
     case .plugin(let plugin, _):
       library.installedPlugins = (library.installedPlugins ?? []).union([plugin.installedSource])
+      if library.pluginNames == nil { library.pluginNames = [:] }
+      library.pluginNames?[plugin.installedSource] = plugin.displayName
     case .server(let source?, _): library.add(.init(domain: source.domain, surfaces: ["mcp"]))
     case .server(nil, _): break
     }
@@ -124,6 +127,7 @@ struct MarketActionFlow {
 
 struct MarketDirectory {
   var items: [MarketItem] = [], accounts: [LinkedApp] = [], warnings: [String] = []
+  var installs: [ManagedInstall] = []
   static let brands: [String: (name: String, category: String, summary: String)] = [
     "gmail": ("Gmail", "Communication", "Find email threads and draft replies in your mailbox."),
     "slack": ("Slack", "Communication", "Find channels and read recent conversations."),
@@ -157,10 +161,15 @@ struct MarketDirectory {
     return url
   }
   static func sample(_ library: SampleIntegrations, seed: CatalogSeed) -> Self {
-    let figma = MarketPlugin(
+    var figma = MarketPlugin(
       id: "sample-figma", displayName: "Figma", description: brands["figma"]!.summary,
       source: "sample:figma", installedSource: "sample:figma", category: "Design",
       domains: ["figma.com"])
+    figma.hasConnector = true; figma.skillCount = 2
+    let additions = IntegrationFixtures.repositories.filter { $0 != "Figma" }.map { title in
+      let preview = IntegrationFixtures.manifest(title)
+      return MarketPlugin(id: "fixture:" + title, displayName: title, description: preview.description ?? title, source: IntegrationFixtures.repo(title), installedSource: IntegrationFixtures.repo(title), category: "Productivity", domains: [], name: title == "Slack triage" ? "Slack" : title, hasConnector: !preview.mcpServers.isEmpty, skillCount: preview.skills.count)
+    }
     let sources = seed.sources.filter { $0.surfaces.contains("mcp") }.map { source in
       let info = brands[brand(source.domain)]
       return MarketSource(
@@ -168,7 +177,7 @@ struct MarketDirectory {
         summary: info?.summary ?? "")
     }
     return assemble(
-      apps: library.catalog(seed), accounts: library.accounts, plugins: [figma],
+      apps: library.catalog(seed), accounts: library.accounts, plugins: [figma] + additions,
       installed: library.installedPlugins ?? [], sources: sources, servers: library.servers,
       tools: Dictionary(uniqueKeysWithValues: seed.apps.map { ($0.slug, $0.tools) }))
   }
@@ -242,7 +251,6 @@ struct MarketDirectory {
   private struct PluginFeed: Decodable {
     let entries: [MarketPlugin], unavailableRegistries: [String]
   }
-  private struct Install: Decodable { let kind: String, source: String }
   private struct SourceFeed: Decodable {
     struct Result: Decodable {
       struct Surface: Decodable {
@@ -257,7 +265,7 @@ struct MarketDirectory {
     var warnings: [String] = []
     async let servers: [ToolServer] = api.rpc("mcp/servers/list")
     async let pluginFeed: PluginFeed = api.rpc("marketplace/catalog", ["query": ""])
-    async let installs: [Install] = api.rpc("capabilities/list")
+    async let installs: [ManagedInstall] = api.rpc("capabilities/list")
     async let sourceFeed: SourceFeed = api.rpc("capabilities/catalogSearch", ["query": ""])
     let catalog: [CatalogEntry] = try await api.rpc("connections/catalog")
     let accounts: [LinkedApp] = try await api.rpc("connections/list")
@@ -265,9 +273,11 @@ struct MarketDirectory {
     var installed = Set<String>()
     var sources: [MarketSource] = []
     var configured: [ToolServer] = []
+    var records: [ManagedInstall] = []
+    do { records = try await installs; installed = Set(records.filter { $0.kind == "plugin" }.map(\.source)) }
+    catch { warnings.append("Installed sources could not be loaded.") }
     do {
       let feed = try await pluginFeed
-      installed = Set(try await installs.filter { $0.kind == "plugin" }.map(\.source))
       plugins = feed.entries
       if !feed.unavailableRegistries.isEmpty {
         warnings.append("Some plugin registries are unavailable.")
@@ -291,6 +301,7 @@ struct MarketDirectory {
       apps: catalog, accounts: accounts, plugins: plugins, installed: installed, sources: sources,
       servers: configured)
     directory.warnings = warnings
+    directory.installs = records
     return directory
   }
 }

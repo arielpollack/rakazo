@@ -11,7 +11,7 @@ struct LinkedApp: Codable, Identifiable {
   var displayName: String, status: String
 }
 
-struct IntegrationTool: Decodable { let name: String, description: String }
+struct IntegrationTool: Codable, Hashable { let name: String, description: String }
 
 struct CatalogSeed: Decodable {
   struct App: Decodable { let slug: String, name: String, noAuth: Bool, tools: [IntegrationTool] }
@@ -33,10 +33,15 @@ struct ToolServer: Codable, Identifiable {
     var status: String
     var message: String? = nil, code: String? = nil, toolCount: Int? = nil
   }
-  let id: String, name: String, transport: String
+  let id: String
+  var name: String, transport: String
   var oauthStatus: String, enabled: Bool, health: Health
   var allBots: Bool? = nil, oauthClientId: String? = nil
   var endpoint: String? = nil
+  var slug: String?, description: String?, command: String?, hasArgs: Bool?, hasSecret: Bool?
+  var envKeys: [String]?, fileKeys: [String]?, headerKeys: [String]?, verbatimResults: Bool?
+  var availability: SpaceTool.Availability?, installId: String?
+  var sampleTools: [IntegrationTool]?
   var connectionLabel: String {
     if !enabled { return "Disabled" }
     if health.code == "MCP_OAUTH_CLIENT_REQUIRED" && oauthClientId == nil {
@@ -54,6 +59,8 @@ struct SampleIntegrations: Codable {
   var servers: [ToolServer] = []
   var assignments: [String: Set<String>] = [:]
   var installedPlugins: Set<String>? = nil
+  var pluginNames: [String: String]? = nil
+  var toolRules: [String: [String: [String]]]? = nil
 
   static func initial(space: String) -> Self {
     guard space == "local" else { return Self() }

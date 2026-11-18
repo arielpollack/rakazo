@@ -50,6 +50,7 @@ struct NavigationData: Codable {
   var spaces: [Named]
 }
 struct Account: Codable {
+  var isAdmin: Bool? = nil
   var userId: String
   var email: String
   var name: String
