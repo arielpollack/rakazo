@@ -80,6 +80,7 @@ extension WorkspaceStore: PrivateSpaceOperations {
     guard var local = sample else { throw Failure("No active workspace.") }
     let id = UUID().uuidString
     local.spaces.append(.init(id: id, name: trimmed, bots: [], groups: [], botSections: []))
+    for item in local.accountTools where item.availability.allSpaces { local.applyScope(item.key, item.availability) }
     sample = local
     return id
   }
@@ -120,12 +121,22 @@ extension Sample {
         tools[key, default: SpaceTool(kind: kind, id: id, name: name,
           availability: .init(allSpaces: false, spaceIds: []))].availability.spaceIds.append(space.id)
       }
-      for server in library.servers { include("mcpServer", server.id, server.name) }
+      for server in library.servers where server.installId == nil {
+        include("mcpServer", server.id, server.name)
+        if let scope = server.availability { tools[.init(kind: "mcpServer", id: server.id)]?.availability = scope }
+      }
       for plugin in library.installedPlugins ?? [] {
         include("install", plugin, library.pluginNames?[plugin] ?? String(plugin.split(separator: ":").last ?? "Plugin").capitalized)
       }
     }
-    return (Array(tools.values) + (spaceSkills ?? [])).sorted {
+    for item in spaceSkills ?? [] { tools[item.key] = item }
+    for skill in integrationRecords?.skills ?? [] where skill.editable {
+      if let scope = skill.availability { let item = SpaceTool(kind: "skill", id: skill.id, name: skill.name, availability: scope); tools[item.key] = item }
+    }
+    for install in integrationRecords?.installs ?? [] {
+      if let scope = install.availability { let item = SpaceTool(kind: "install", id: install.id, name: install.name, availability: scope); tools[item.key] = item }
+    }
+    return tools.values.sorted {
       ($0.name, $0.kind, $0.id) < ($1.name, $1.kind, $1.id)
     }
   }
@@ -133,34 +144,36 @@ extension Sample {
   mutating func chooseTools(_ selection: Set<SpaceTool.Key>, for space: String) throws {
     guard spaces.contains(where: { $0.id == space }) else { throw Failure("Space not found.") }
     let items = accountTools
-    var target = library(in: space)
     for item in items {
       let scopes = item.availability
       let wanted = selection.contains(item.key)
       guard wanted != (scopes.allSpaces || scopes.spaceIds.contains(space)) else { continue }
-      switch item.kind {
-      case "mcpServer":
-        if wanted, let home = scopes.spaceIds.first,
-          var server = library(in: home).servers.first(where: { $0.id == item.id }) {
-          server.allBots = false
-          target.servers.append(server)
-        } else if !wanted {
-          target.servers.removeAll { $0.id == item.id }; target.assignments[item.id] = nil
-        }
-      case "install":
-        if wanted {
-          target.installedPlugins = (target.installedPlugins ?? []).union([item.id])
-          target.pluginNames = (target.pluginNames ?? [:]).merging([item.id: item.name]) { _, name in name }
-        } else { target.installedPlugins?.remove(item.id); target.pluginNames?[item.id] = nil }
-      case "skill":
-        if let index = spaceSkills?.firstIndex(where: { $0.key == item.key }) {
-          let others = (scopes.allSpaces ? spaces.map(\.id) : scopes.spaceIds).filter { $0 != space }
-          spaceSkills?[index].availability = .init(allSpaces: false, spaceIds: others + (wanted ? [space] : []))
-        }
-      default: break
-      }
+      let others = (scopes.allSpaces ? spaces.map(\.id) : scopes.spaceIds).filter { $0 != space }
+      applyScope(item.key, .init(allSpaces: false, spaceIds: others + (wanted ? [space] : [])))
     }
+  }
+  mutating func applyScope(_ key: SpaceTool.Key, _ scope: SpaceTool.Availability) {
     if integrations == nil { integrations = [:] }
-    integrations?[space] = target
+    if key.kind == "skill" {
+      if let index = integrationRecords?.skills.firstIndex(where: { $0.id == key.id }) { integrationRecords?.skills[index].availability = scope }
+      if let index = spaceSkills?.firstIndex(where: { $0.key == key }) { spaceSkills?[index].availability = scope }; return
+    }
+    let install = integrationRecords?.installs.first { key.kind == "install" && $0.id == key.id }
+    if let index = integrationRecords?.installs.firstIndex(where: { key.kind == "install" && $0.id == key.id }) { integrationRecords?.installs[index].availability = scope }
+    let servers = spaces.flatMap { library(in: $0.id).servers }.filter { key.kind == "mcpServer" ? $0.id == key.id : $0.installId == key.id }
+    let plugin = key.kind == "install" && (install?.kind == "plugin" || (install == nil && spaces.contains { library(in: $0.id).installedPlugins?.contains(key.id) == true }))
+    let name = install?.name ?? spaces.compactMap { integrations?[$0.id]?.pluginNames?[key.id] }.first ?? key.id
+    for space in spaces {
+      var library = library(in: space.id)
+      if plugin {
+        if scope.includes(space.id) { library.installedPlugins = (library.installedPlugins ?? []).union([key.id]); library.pluginNames = (library.pluginNames ?? [:]).merging([key.id: name]) { _, value in value } }
+        else { library.installedPlugins?.remove(key.id); library.pluginNames?[key.id] = nil }
+      }
+      for var server in servers {
+        if !scope.includes(space.id) { library.dropServer(server.id) }
+        else if let index = library.servers.firstIndex(where: { $0.id == server.id }) { library.servers[index].availability = scope }
+        else { server.availability = scope; server.allBots = false; library.servers.append(server) }
+      }; integrations?[space.id] = library
+    }
   }
 }

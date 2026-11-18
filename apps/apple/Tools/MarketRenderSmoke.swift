@@ -26,6 +26,7 @@ import Vision
     try await checkPrivateSpace(store: store, output: output)
     func directory() -> MarketDirectory { .sample(store.sampleIntegrations!, seed: seed) }
     let initial = directory()
+    try await checkManagement(store: store, directory: initial, output: output)
     precondition(
       initial.items.prefix(6).map(\.name) == [
         "Gmail", "Slack", "Google Drive", "Figma", "Linear", "Notion",
@@ -42,7 +43,7 @@ import Vision
         scheme: scheme, width: width, height: height,
         contains: file == "compact"
           ? ["Connect Slack", "Explore integrations"]
-          : ["Connect Slack", "Connect Google Drive", "Install Figma", "Configured", "Team inbox"])
+          : ["Connect Slack", "Connect Google Drive", "Install Figma", "Configured", "2 accounts"])
     }
     let slack = initial.items[1]
     try await checkCardHits(slack)
@@ -109,6 +110,42 @@ import Vision
       )
       .frame(width: 268, height: 151)
     }
+  }
+
+  @MainActor private static func checkManagement(store: WorkspaceStore, directory: MarketDirectory, output: URL) async throws {
+    let isolated = WorkspaceStore(sample: .initial, persistent: false)
+    guard let server = try await isolated.managedServers().first(where: { $0.id == "sample-brain" }),
+      let gmail = directory.items.compactMap({ if case .app(let app, _) = $0.content, app.slug == "gmail" { return app }; return nil }).first else { throw Failure("Missing management fixtures.") }
+    let routes: [(String, ManageRoute, [String])] = [
+      ("server", .server(server), ["Agentic Brain", "Reconnect", "Remove server", "Edit configuration"]),
+      ("configuration", .configuration(server, server.transport), ["Server name", "Transport", "Server enabled", "Save changes"]),
+      ("accounts", .app(gmail), ["Team inbox", "Personal inbox", "Disconnect Gmail"]),
+      ("plugin", .plugin(IntegrationFixtures.repo("Linear"), IntegrationFixtures.repo("Linear"), "Linear", false), ["Connector", "2 skills", "Add skills", "Remove plugin"]),
+      ("skills", .skills, ["Your library", "Weekly brief", "New skill"]),
+      ("custom", .custom, ["OpenAPI document", "GraphQL endpoint", "GitHub plugin"])
+    ]
+    for (index, route) in routes.enumerated() {
+      try await render(MacManagement(route.1, store: store, directory: directory), to: output.appendingPathComponent("management-" + route.0 + ".png"), scheme: index.isMultiple(of: 2) ? .dark : .light, width: 704, height: 650, contains: route.2)
+    }
+    let host = NSHostingView(rootView: MacManagement(.server(server), store: isolated, directory: directory).frame(width: 708, height: 654))
+    let window = pointerWindow(host, size: host.fittingSize)
+    defer { window.orderOut(nil) }
+    func locate(_ label: String) async throws -> NSPoint {
+      try await Task.sleep(for: .milliseconds(250)); host.layoutSubtreeIfNeeded()
+      guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { throw Failure("Missing Mac panel bitmap.") }
+      host.cacheDisplay(in: host.bounds, to: bitmap); guard let image = bitmap.cgImage else { throw Failure("Missing Mac panel image.") }
+      let request = VNRecognizeTextRequest(); request.recognitionLevel = .accurate
+      try VNImageRequestHandler(cgImage: image).perform([request]); let rows = request.results ?? []
+      func key(_ label: String) -> String { label.lowercased().filter { $0.isLetter || $0.isNumber } }
+      guard let row = rows.first(where: { key($0.topCandidates(1).first?.string ?? "") == key(label) }) else { throw Failure("Could not locate \(label) in panel: \(rows.compactMap { $0.topCandidates(1).first?.string }.joined(separator: "; "))") }
+      return NSPoint(x: row.boundingBox.midX * host.frame.width, y: row.boundingBox.midY * host.frame.height)
+    }
+    func press(_ label: String) async throws { let point = try await locate(label); try await click(point, in: window) }
+    try await press("Edit configuration"); try await press("Advanced"); try await press("Return tool results verbatim"); try await press("Save changes")
+    guard try await isolated.managedServers().first(where: { $0.id == server.id })?.verbatimResults == true else { throw Failure("Pointer edit did not persist.") }
+    try await press("Remove server"); try await press("Cancel"); try await press("Remove server"); try await press("Remove server")
+    guard try await !isolated.managedServers().contains(where: { $0.id == server.id }) else { throw Failure("Pointer confirmation did not remove server.") }
+    print("PASS: six production management sheets rendered and OCR checked; clicked Edit → Advanced → toggle → Save → Remove → Cancel → Remove → confirm, and verified fixture state.")
   }
 
   private final class HitTestWindow: NSPanel {
@@ -208,7 +245,10 @@ import Vision
       throw Failure("Private sheet did not fit: \(empty), \(ready), \(issue), \(tall)")
     }
     print("PASS: Mac fitted heights (pt) empty=\(empty), ready=\(ready), inline error=\(issue), 45+ tools=\(tall); buttons visible.")
-    let actual = WorkspaceStore(sample: .initial, persistent: false), interactive = PrivateSpaceFlow()
+    var pointerSample = Sample.initial
+    var onlyLinear = SampleIntegrations.initial(space: "local"); onlyLinear.servers.removeAll { $0.id != "linear.app" }
+    pointerSample.integrationRecords = .init(); pointerSample.spaceSkills = []; pointerSample.integrations = ["local": onlyLinear]
+    let actual = WorkspaceStore(sample: pointerSample, persistent: false), interactive = PrivateSpaceFlow()
     var dismissals = 0
     interactive.name = "Pointer QA"
     let host = NSHostingView(rootView: PrivateSpaceSheet(store: actual, listHeightLimit: 240,

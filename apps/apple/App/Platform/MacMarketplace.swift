@@ -288,7 +288,7 @@
               return false
             }
             Button {
-              if let entry { show(entry) } else { setup = .management(.account(.init(connectorId: account.connectorId, name: account.provider, slug: account.provider, connected: true, noAuth: false), account)) }
+              if let entry, case .app(let app, _) = entry.content { setup = .management(.account(app, account)) } else { setup = .management(.account(.init(connectorId: account.connectorId, name: account.provider, slug: account.provider, connected: true, noAuth: false), account)) }
             } label: {
               HStack {
                 MarketMark(

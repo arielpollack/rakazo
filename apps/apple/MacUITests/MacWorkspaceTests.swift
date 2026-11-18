@@ -301,21 +301,22 @@ final class MacWorkspaceTests: XCTestCase {
     let card = cardQuery.firstMatch
     XCTAssertTrue(card.waitForExistence(timeout: 5))
     card.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.79)).click()
-    let back = app.buttons["Discover"].firstMatch
-    XCTAssertTrue(app.staticTexts["What your bot can do"].waitForExistence(timeout: 5))
-    back.click()
+    let close = app.buttons["Close integration management"].firstMatch
+    XCTAssertTrue(app.staticTexts["No connected accounts"].waitForExistence(timeout: 5))
+    close.click()
     XCTAssertTrue(connect.waitForExistence(timeout: 5)); connect.click()
-    let approve = app.buttons["Approve sample"].firstMatch
+    let approve = app.buttons["Start sample authorization"].firstMatch
     XCTAssertTrue(approve.waitForExistence(timeout: 5)); app.buttons["Cancel"].firstMatch.click()
     XCTAssertTrue(connect.waitForExistence(timeout: 5)); connect.click()
     XCTAssertTrue(approve.waitForExistence(timeout: 5)); approve.click()
+    app.buttons["Check connection"].firstMatch.click()
     let confirmed = NSPredicate(format: "value CONTAINS %@", "Connected · Slack")
     XCTAssertTrue(cardQuery.matching(confirmed).firstMatch.waitForExistence(timeout: 5))
     XCTAssertFalse(connect.exists)
     card.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.83)).click()
-    XCTAssertTrue(app.buttons["Manage Slack"].firstMatch.waitForExistence(timeout: 5)); back.click()
+    XCTAssertTrue(app.buttons["Manage Slack"].firstMatch.waitForExistence(timeout: 5)); close.click()
     app.buttons["My integrations"].firstMatch.click()
-    XCTAssertTrue(app.staticTexts["App accounts  3"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["App accounts  4"].waitForExistence(timeout: 5))
   }
 
   func testNativeDividerAndInspectorInWideWindow() throws {
