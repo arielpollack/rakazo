@@ -11,7 +11,7 @@ struct CreateForm: View {
   @State private var busy = false
   @State private var problem: String?
   var title: String {
-    kind == .space ? "New private space" : kind == .group ? "New group chat" : "New bot"
+    kind == .group ? "New group chat" : "New bot"
   }
   var body: some View {
     NavigationStack {
@@ -59,7 +59,7 @@ struct CreateForm: View {
       do {
         try await store.create(
           name: name.trimmingCharacters(in: .whitespacesAndNewlines), description: description,
-          members: kind == .group ? Array(members) : nil, privateSpace: kind == .space)
+          members: kind == .group ? Array(members) : nil)
         finished()
       } catch { problem = error.localizedDescription }
     }

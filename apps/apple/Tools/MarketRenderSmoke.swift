@@ -23,6 +23,7 @@ import Vision
     let output = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
     let seed = try CatalogSeed.bundled.get()
     let store = WorkspaceStore(sample: .initial, persistent: false)
+    try await checkPrivateSpace(store: store, output: output)
     func directory() -> MarketDirectory { .sample(store.sampleIntegrations!, seed: seed) }
     let initial = directory()
     precondition(
@@ -87,8 +88,8 @@ import Vision
       MacMarketplace(store: other, collection: .manage),
       to: output.appendingPathComponent("manage.png"), scheme: .dark,
       contains: ["Team inbox", "Release watch", "Sign in again", "Not working"])
-    try await other.create(
-      name: "Second workspace", description: "", members: nil, privateSpace: true)
+    let secondID = try await other.createPrivateSpace(name: "Second workspace")
+    try await other.openPrivateSpace(secondID)
     precondition(
       other.sampleIntegrations!.accounts.isEmpty
         && other.sampleIntegrations!.installedPlugins == nil)
@@ -117,14 +118,10 @@ import Vision
     override var mouseLocationOutsideOfEventStream: NSPoint { localPointer }
   }
 
-  @MainActor private static func checkCardHits(_ item: MarketItem) async throws {
-    var details = 0
-    var actions = 0
-    let host = NSHostingView(
-      rootView: HitTestCard(item: item, open: { details += 1 }, connect: { actions += 1 }))
+  @MainActor private static func pointerWindow(_ host: NSView, size: CGSize) -> HitTestWindow {
     let right = NSScreen.screens.map(\.frame.maxX).max() ?? 0
     let window = HitTestWindow(
-      contentRect: NSRect(x: right + 1000, y: 0, width: 268, height: 151),
+      contentRect: NSRect(origin: .init(x: right + 1000, y: 0), size: size),
       styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
     window.alphaValue = 0
     window.ignoresMouseEvents = true
@@ -132,43 +129,50 @@ import Vision
     window.isExcludedFromWindowsMenu = true
     window.contentView = host
     window.orderBack(nil)
-    defer { window.orderOut(nil) }
     host.layoutSubtreeIfNeeded()
-    try await Task.sleep(for: .milliseconds(180))
-    func click(_ x: CGFloat, _ y: CGFloat) async throws {
-      guard window.alphaValue == 0, !window.canBecomeKey,
-        !NSScreen.screens.contains(where: { $0.frame.intersects(window.frame) })
-      else { throw Failure("Expected an offscreen hit-test window.") }
-      let point = NSPoint(x: x, y: y)
-      window.localPointer = point
-      func event(_ type: NSEvent.EventType) -> NSEvent {
-        NSEvent.mouseEvent(
-          with: type, location: point, modifierFlags: [],
-          timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
-          context: nil, eventNumber: 1, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0)!
-      }
-      let down = event(.leftMouseDown)
-      let up = event(.leftMouseUp)
-      guard down.window === window, up.window === window else {
-        throw Failure("Unbound synthetic events.")
-      }
-      NSApp.postEvent(up, atStart: true)
-      NSApp.sendEvent(down)
-      if let queued = NSApp.nextEvent(
-        matching: .leftMouseUp, until: .distantPast, inMode: .default, dequeue: true)
-      {
-        NSApp.sendEvent(queued)
-      }
-      try await Task.sleep(for: .milliseconds(45))
+    return window
+  }
+
+  @MainActor private static func click(_ point: NSPoint, in window: HitTestWindow) async throws {
+    guard window.alphaValue == 0, window.ignoresMouseEvents, !window.canBecomeKey,
+      !NSScreen.screens.contains(where: { $0.frame.intersects(window.frame) })
+    else { throw Failure("Expected an offscreen hit-test window.") }
+    window.localPointer = point
+    func event(_ type: NSEvent.EventType) -> NSEvent {
+      NSEvent.mouseEvent(
+        with: type, location: point, modifierFlags: [],
+        timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+        context: nil, eventNumber: 1, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0)!
     }
+    let down = event(.leftMouseDown)
+    let up = event(.leftMouseUp)
+    guard down.window === window, up.window === window else {
+      throw Failure("Unbound synthetic events.")
+    }
+    NSApp.postEvent(up, atStart: true)
+    NSApp.sendEvent(down)
+    if let queued = NSApp.nextEvent(
+      matching: .leftMouseUp, until: .distantPast, inMode: .default, dequeue: true)
+    {
+      NSApp.sendEvent(queued)
+    }
+    try await Task.sleep(for: .milliseconds(45))
+  }
+
+  @MainActor private static func checkCardHits(_ item: MarketItem) async throws {
+    var details = 0, actions = 0
+    let host = NSHostingView(rootView: HitTestCard(item: item, open: { details += 1 }, connect: { actions += 1 }))
+    let window = pointerWindow(host, size: .init(width: 268, height: 151))
+    defer { window.orderOut(nil) }
+    try await Task.sleep(for: .milliseconds(180))
     for point in [NSPoint(x: 248, y: 15), NSPoint(x: 42, y: 82), NSPoint(x: 27, y: 116)] {
       let prior = details
-      try await click(point.x, point.y)
+      try await click(point, in: window)
       guard details == prior + 1, actions == 0 else {
         throw Failure("Card detail hit at \(point): details=\(details), actions=\(actions)")
       }
     }
-    try await click(60, 26)
+    try await click(.init(x: 60, y: 26), in: window)
     let connected = item.confirmed != nil
     guard details == (connected ? 4 : 3), actions == (connected ? 0 : 1) else {
       throw Failure("Footer hit (confirmed=\(connected)): details=\(details), actions=\(actions)")
@@ -178,11 +182,62 @@ import Vision
     )
   }
 
-  @MainActor static func render<Content: View>(
+  @MainActor private static func checkPrivateSpace(store: WorkspaceStore, output: URL) async throws {
+    func capture(_ flow: PrivateSpaceFlow, _ label: String, _ scheme: ColorScheme,
+      _ expected: [String], source: WorkspaceStore, cap: CGFloat = 240) async throws -> Int {
+      let sheet = PrivateSpaceSheet(store: source, listHeightLimit: cap, close: {}, flow: flow)
+        .frame(width: 408).background(Color(nsColor: .windowBackgroundColor))
+      return try await render(sheet, to: output.appendingPathComponent("space-\(label).png"),
+        scheme: scheme, width: 408, height: nil, contains: expected)
+    }
+    let flow = PrivateSpaceFlow()
+    let empty = try await capture(flow, "empty", .dark, ["New private space", "Space name", "Cancel", "Create space"], source: store)
+    flow.name = "Customer support"
+    let ready = try await capture(flow, "ready", .light, ["Customer support", "Create space"], source: store)
+    flow.name = String(repeating: "A", count: 61)
+    let issue = try await capture(flow, "validation", .dark, ["Use 60 characters or fewer", "Create space"], source: store)
+    var data = Sample.initial
+    data.spaceSkills = (1...45).map { index in
+      SpaceTool(kind: "skill", id: "skill-\(index)", name: String(format: "Daily note %02d", index),
+        availability: .init(allSpaces: true, spaceIds: ["local"]))
+    }
+    let tallStore = WorkspaceStore(sample: data, persistent: false)
+    flow.name = "Customer support"; _ = await flow.advance(using: tallStore)
+    let tall = try await capture(flow, "tools", .light, ["What can this space use", "Daily note 01", "Continue"], source: tallStore)
+    guard empty < 220, ready == empty, issue > empty, tall < 390 else {
+      throw Failure("Private sheet did not fit: \(empty), \(ready), \(issue), \(tall)")
+    }
+    print("PASS: Mac fitted heights (pt) empty=\(empty), ready=\(ready), inline error=\(issue), 45+ tools=\(tall); buttons visible.")
+    let actual = WorkspaceStore(sample: .initial, persistent: false), interactive = PrivateSpaceFlow()
+    var dismissals = 0
+    interactive.name = "Pointer QA"
+    let host = NSHostingView(rootView: PrivateSpaceSheet(store: actual, listHeightLimit: 240,
+      close: { dismissals += 1 }, flow: interactive).frame(width: 408))
+    let window = pointerWindow(host, size: host.fittingSize)
+    defer { window.orderOut(nil) }
+    try await Task.sleep(for: .milliseconds(180))
+    try await click(.init(x: 348, y: 34), in: window)
+    guard case .choosing(_, let choices) = interactive.step,
+      let linear = choices.firstIndex(where: { $0.name == "Linear" }), dismissals == 0 else {
+      throw Failure("Mac Create button did not present the tool picker.")
+    }
+    window.setContentSize(host.fittingSize); host.layoutSubtreeIfNeeded()
+    try await Task.sleep(for: .milliseconds(120))
+    let rowY = 22 + 24 + 20 + CGFloat(choices.count - 1 - linear) * 32 + 16
+    try await click(.init(x: 32, y: rowY), in: window)
+    guard interactive.selection.contains(choices[linear].key) else { throw Failure("Mac checkbox hit did not select Linear.") }
+    try await click(.init(x: 348, y: 34), in: window)
+    guard dismissals == 1, actual.navigation?.current.name == "Pointer QA",
+      actual.sampleIntegrations?.servers.map(\.name) == ["Linear"] else { throw Failure("Mac Continue did not open the chosen configuration.") }
+    print("PASS: Create → check Linear → Continue via native pointer handling inside the isolated Mac panel.")
+  }
+
+  @discardableResult @MainActor static func render<Content: View>(
     _ content: Content, to url: URL, scheme: ColorScheme = .light,
-    width: Int = 1040, height: Int = 702, contains: [String], omits: [String] = []
-  ) async throws {
-    let size = CGSize(width: width, height: height)
+    width: Int = 1040, height: Int? = 702, contains: [String], omits: [String] = []
+  ) async throws -> Int {
+    let fitted = height ?? Int(ceil(NSHostingView(rootView: content).fittingSize.height))
+    let size = CGSize(width: width, height: fitted)
     let view = NSHostingView(
       rootView: content.environment(\.colorScheme, scheme).frame(
         width: size.width, height: size.height))
@@ -217,5 +272,6 @@ import Vision
     for value in omits where normalized.contains(normalize(value)) {
       throw Failure("\(url.lastPathComponent) unexpectedly shows \(value).")
     }
+    return fitted
   }
 }

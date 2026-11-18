@@ -6,6 +6,28 @@ final class WorkspaceTests: XCTestCase {
     continueAfterFailure = false
   }
 
+  func testPrivateSpaceCancelCreateAndSelectTools() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--test-sample"]
+    app.launch()
+    let create = app.descendants(matching: .any).matching(identifier: "create").firstMatch
+    XCTAssertTrue(create.waitForExistence(timeout: 12))
+    func newSpace() {
+      create.tap(); app.buttons["New private space"].firstMatch.tap()
+    }
+    newSpace()
+    let field = app.textFields["newName"], submit = app.buttons["createSubmit"]
+    XCTAssertTrue(field.waitForExistence(timeout: 5)); XCTAssertFalse(submit.isEnabled)
+    app.buttons["Cancel"].tap(); XCTAssertTrue(field.waitForNonExistence(timeout: 5))
+    newSpace(); field.tap(); field.typeText("Studio QA"); submit.tap()
+    let skill = app.buttons["space-tool-skill-sample-release-notes"].firstMatch
+    let server = app.buttons["space-tool-mcpServer-linear.app"].firstMatch
+    XCTAssertTrue(skill.waitForExistence(timeout: 5)); XCTAssertTrue(skill.isSelected)
+    XCTAssertFalse(server.isSelected); server.tap(); XCTAssertTrue(server.isSelected)
+    app.buttons["spaceContinue"].tap()
+    XCTAssertTrue(app.buttons["Studio QA, switch workspace"].waitForExistence(timeout: 8))
+  }
+
   func testCommandKFromComposerPreservesDraftAndNavigates() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--test-sample"]
