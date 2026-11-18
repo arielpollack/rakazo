@@ -1,0 +1,679 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		035E9CF023BB661F3B82C156 /* ConversationAccent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE08CD0F7561B3525F937972 /* ConversationAccent.swift */; };
+		03FDB43FF2C39E9894E037FD /* PlatformUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A9B31E7DFF73CCB1554B7BC /* PlatformUI.swift */; };
+		0443E0F0D42F420EF62E6381 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F587A90BCFF4085E47A8D6E7 /* Assets.xcassets */; };
+		061D8418CBF9E157C8CDC924 /* MacMarketInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67D1C0120D0F093BD7A0ACAD /* MacMarketInstall.swift */; };
+		0E855941539DE8E24B1AF536 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45C9523887EE04F40E7CAE2 /* Models.swift */; };
+		1C67DAF9A380F514248D4854 /* MacWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EF59F1F8B4ACB7D77CFC049 /* MacWorkspaceTests.swift */; };
+		2317F4ACBED9088DD4CEAB03 /* MessageContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06BB7B5334DDEEDF2E3147B9 /* MessageContent.swift */; };
+		24A78C382F665AB2683863A7 /* MacMarketCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E00A5B558C6A92EE667C916 /* MacMarketCard.swift */; };
+		25AE61601BABF49CA7EF2BA1 /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 731BA5B16664FF5023F09C3D /* Profile.swift */; };
+		2C40450F736AFA57F00B1A98 /* MacCommandQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5754BD07BE81CDE0D9C489CA /* MacCommandQuery.swift */; };
+		33C7E3CC5F7D44A9FF4F3D3F /* HistorySearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A9C17101ACCD9CF44AE960 /* HistorySearch.swift */; };
+		3FE74FD746F8EC35B2F97049 /* Design.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D368FC1E4FB2BD1F868DCBA /* Design.swift */; };
+		568729F08181D194EF7A40AB /* Sample.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E6363880938A03F709E429F /* Sample.swift */; };
+		72F7C5BB76FA7AFF5B4B28CD /* Connection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1357AB75317CF14B5A8B807 /* Connection.swift */; };
+		73FB6C5F4D23B8AE32B14558 /* ComputerViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18CDBE0724650E990F1FF79E /* ComputerViews.swift */; };
+		7D4E1AAB4E102CB3F0174B4A /* MacPassageReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36EFE7E4D6119E556E256086 /* MacPassageReader.swift */; };
+		892475DBC0ADF3FA97580EF1 /* WorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF0CA9EBF771A83CDC8FF419 /* WorkspaceTests.swift */; };
+		8C3635DB690A21758DF0D323 /* AgentBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F50277B333FA10B4C6184B1 /* AgentBlock.swift */; };
+		928F3B8D934C22B2376A715A /* MacMarketplace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF131DFE3747D0889852FAD7 /* MacMarketplace.swift */; };
+		93AE6F948FDABCC0198FCC02 /* SampleComputer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 749B9F03C07051249FA3F79D /* SampleComputer.swift */; };
+		946D0DB0C445BBBCFF79892A /* MarketplaceCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BE707A7AB369B5B059ABEF0 /* MarketplaceCatalog.swift */; };
+		A7C21C13645254EB700BB3A6 /* IntegrationLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71BA637C630CEB24BBBF5EA3 /* IntegrationLibrary.swift */; };
+		A919415CBDBF9BF38AF4FF80 /* iOSCommandQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A4D06DC782EF708BFDB71B8 /* iOSCommandQuery.swift */; };
+		AE6C4AC0AEE12129BB6F097A /* Brandmarks in Resources */ = {isa = PBXBuildFile; fileRef = A4380688CF1259021D032F01 /* Brandmarks */; };
+		AED14D5A40BECC59FE9565E0 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74B5501DD8C95153F3ED0C76 /* Conversation.swift */; };
+		AEFE06CB05D24A0C73F653FA /* sample-catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = 81BBFE33A77070F353B93C26 /* sample-catalog.json */; };
+		BCADF6D9EB1FB96C690E34E6 /* Panels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 995269D4E998FFB60F10F1D6 /* Panels.swift */; };
+		BEF79ACABB43215B0645B0F5 /* iOSPassageReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24C19BD39641F64D45FF5562 /* iOSPassageReader.swift */; };
+		C5AC01709510644AA843AEB1 /* MobileWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E388FD29E46E1F58E951E0C /* MobileWorkspace.swift */; };
+		C83E2ADC4BCA0B3649A7B8CE /* WorkspaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28A74FF1AC9E32C2DB8BE266 /* WorkspaceStore.swift */; };
+		D0798DBF975FAD317BBCA29D /* RakazoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 044C7116D62AF3E51E7FFFCD /* RakazoApp.swift */; };
+		D33E2765A965357995982629 /* ChatSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90CDC5F0C21E6A74E008D0F5 /* ChatSidebar.swift */; };
+		DCC457AED2D7F48FD67B5C22 /* Shell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19ED9EBDE30E8B7F91E8C292 /* Shell.swift */; };
+		DD69CCF3B326C78AAA897155 /* CommandPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4AF57D33D82DE8FEF087E3B /* CommandPalette.swift */; };
+		DFE60755C3C2F84FE3217011 /* Timeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 430F82BCC6D96B55E0369863 /* Timeline.swift */; };
+		E22A6E5A37F2EE64A6C9783E /* MacWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E73D1CEC64DA10C45F77D0A /* MacWorkspace.swift */; };
+		F550210DE77695617E9919AD /* IntegrationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5762F995347228EAC589F569 /* IntegrationViews.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		45853619165071E4BC7D95F9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4297686772576464FDB1E364 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A69118EC3FF384960799CF9B;
+			remoteInfo = RakazoNative;
+		};
+		C50D6119B2EFE52D2215A8FF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4297686772576464FDB1E364 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A69118EC3FF384960799CF9B;
+			remoteInfo = RakazoNative;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		044C7116D62AF3E51E7FFFCD /* RakazoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RakazoApp.swift; sourceTree = "<group>"; };
+		06BB7B5334DDEEDF2E3147B9 /* MessageContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageContent.swift; sourceTree = "<group>"; };
+		18CDBE0724650E990F1FF79E /* ComputerViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComputerViews.swift; sourceTree = "<group>"; };
+		19ED9EBDE30E8B7F91E8C292 /* Shell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shell.swift; sourceTree = "<group>"; };
+		1E388FD29E46E1F58E951E0C /* MobileWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileWorkspace.swift; sourceTree = "<group>"; };
+		24C19BD39641F64D45FF5562 /* iOSPassageReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSPassageReader.swift; sourceTree = "<group>"; };
+		28A74FF1AC9E32C2DB8BE266 /* WorkspaceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStore.swift; sourceTree = "<group>"; };
+		2F50277B333FA10B4C6184B1 /* AgentBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBlock.swift; sourceTree = "<group>"; };
+		36EFE7E4D6119E556E256086 /* MacPassageReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPassageReader.swift; sourceTree = "<group>"; };
+		430F82BCC6D96B55E0369863 /* Timeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Timeline.swift; sourceTree = "<group>"; };
+		4E6F2358ABFAA4B4E8DCBD22 /* RakazoUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RakazoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4E73D1CEC64DA10C45F77D0A /* MacWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacWorkspace.swift; sourceTree = "<group>"; };
+		5754BD07BE81CDE0D9C489CA /* MacCommandQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacCommandQuery.swift; sourceTree = "<group>"; };
+		5762F995347228EAC589F569 /* IntegrationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationViews.swift; sourceTree = "<group>"; };
+		5BE707A7AB369B5B059ABEF0 /* MarketplaceCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketplaceCatalog.swift; sourceTree = "<group>"; };
+		67D1C0120D0F093BD7A0ACAD /* MacMarketInstall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMarketInstall.swift; sourceTree = "<group>"; };
+		6D368FC1E4FB2BD1F868DCBA /* Design.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Design.swift; sourceTree = "<group>"; };
+		71BA637C630CEB24BBBF5EA3 /* IntegrationLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationLibrary.swift; sourceTree = "<group>"; };
+		731BA5B16664FF5023F09C3D /* Profile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Profile.swift; sourceTree = "<group>"; };
+		749B9F03C07051249FA3F79D /* SampleComputer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleComputer.swift; sourceTree = "<group>"; };
+		74B5501DD8C95153F3ED0C76 /* Conversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Conversation.swift; sourceTree = "<group>"; };
+		7A4D06DC782EF708BFDB71B8 /* iOSCommandQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSCommandQuery.swift; sourceTree = "<group>"; };
+		7A74F90349379A3BE525B90B /* RakazoNative.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RakazoNative.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7EF59F1F8B4ACB7D77CFC049 /* MacWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacWorkspaceTests.swift; sourceTree = "<group>"; };
+		81BBFE33A77070F353B93C26 /* sample-catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "sample-catalog.json"; sourceTree = "<group>"; };
+		8A9B31E7DFF73CCB1554B7BC /* PlatformUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformUI.swift; sourceTree = "<group>"; };
+		8E00A5B558C6A92EE667C916 /* MacMarketCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMarketCard.swift; sourceTree = "<group>"; };
+		90CDC5F0C21E6A74E008D0F5 /* ChatSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSidebar.swift; sourceTree = "<group>"; };
+		995269D4E998FFB60F10F1D6 /* Panels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels.swift; sourceTree = "<group>"; };
+		9E6363880938A03F709E429F /* Sample.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sample.swift; sourceTree = "<group>"; };
+		A4380688CF1259021D032F01 /* Brandmarks */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Brandmarks; path = "Design/Marketplace-assets/Brandmarks"; sourceTree = SOURCE_ROOT; };
+		A45C9523887EE04F40E7CAE2 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		AE08CD0F7561B3525F937972 /* ConversationAccent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationAccent.swift; sourceTree = "<group>"; };
+		AF0CA9EBF771A83CDC8FF419 /* WorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceTests.swift; sourceTree = "<group>"; };
+		BF131DFE3747D0889852FAD7 /* MacMarketplace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMarketplace.swift; sourceTree = "<group>"; };
+		D4AF57D33D82DE8FEF087E3B /* CommandPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPalette.swift; sourceTree = "<group>"; };
+		E6BEA9283283939FE4776C9E /* RakazoMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RakazoMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F1357AB75317CF14B5A8B807 /* Connection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Connection.swift; sourceTree = "<group>"; };
+		F587A90BCFF4085E47A8D6E7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F5A9C17101ACCD9CF44AE960 /* HistorySearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistorySearch.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		284811AD4FC46BAA8AAAB2C4 /* MacUITests */ = {
+			isa = PBXGroup;
+			children = (
+				7EF59F1F8B4ACB7D77CFC049 /* MacWorkspaceTests.swift */,
+			);
+			path = MacUITests;
+			sourceTree = "<group>";
+		};
+		2C89D5A5A2A55610FC00B6F0 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				2F50277B333FA10B4C6184B1 /* AgentBlock.swift */,
+				F587A90BCFF4085E47A8D6E7 /* Assets.xcassets */,
+				90CDC5F0C21E6A74E008D0F5 /* ChatSidebar.swift */,
+				D4AF57D33D82DE8FEF087E3B /* CommandPalette.swift */,
+				18CDBE0724650E990F1FF79E /* ComputerViews.swift */,
+				F1357AB75317CF14B5A8B807 /* Connection.swift */,
+				74B5501DD8C95153F3ED0C76 /* Conversation.swift */,
+				AE08CD0F7561B3525F937972 /* ConversationAccent.swift */,
+				6D368FC1E4FB2BD1F868DCBA /* Design.swift */,
+				F5A9C17101ACCD9CF44AE960 /* HistorySearch.swift */,
+				71BA637C630CEB24BBBF5EA3 /* IntegrationLibrary.swift */,
+				5762F995347228EAC589F569 /* IntegrationViews.swift */,
+				5BE707A7AB369B5B059ABEF0 /* MarketplaceCatalog.swift */,
+				06BB7B5334DDEEDF2E3147B9 /* MessageContent.swift */,
+				A45C9523887EE04F40E7CAE2 /* Models.swift */,
+				995269D4E998FFB60F10F1D6 /* Panels.swift */,
+				731BA5B16664FF5023F09C3D /* Profile.swift */,
+				044C7116D62AF3E51E7FFFCD /* RakazoApp.swift */,
+				81BBFE33A77070F353B93C26 /* sample-catalog.json */,
+				9E6363880938A03F709E429F /* Sample.swift */,
+				749B9F03C07051249FA3F79D /* SampleComputer.swift */,
+				19ED9EBDE30E8B7F91E8C292 /* Shell.swift */,
+				430F82BCC6D96B55E0369863 /* Timeline.swift */,
+				28A74FF1AC9E32C2DB8BE266 /* WorkspaceStore.swift */,
+				B4A2CEC7CC873C5B95C64F80 /* Platform */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		5AAD115DC5E549B06D6BCE6B /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E6BEA9283283939FE4776C9E /* RakazoMacUITests.xctest */,
+				7A74F90349379A3BE525B90B /* RakazoNative.app */,
+				4E6F2358ABFAA4B4E8DCBD22 /* RakazoUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B4A2CEC7CC873C5B95C64F80 /* Platform */ = {
+			isa = PBXGroup;
+			children = (
+				7A4D06DC782EF708BFDB71B8 /* iOSCommandQuery.swift */,
+				24C19BD39641F64D45FF5562 /* iOSPassageReader.swift */,
+				5754BD07BE81CDE0D9C489CA /* MacCommandQuery.swift */,
+				8E00A5B558C6A92EE667C916 /* MacMarketCard.swift */,
+				67D1C0120D0F093BD7A0ACAD /* MacMarketInstall.swift */,
+				BF131DFE3747D0889852FAD7 /* MacMarketplace.swift */,
+				36EFE7E4D6119E556E256086 /* MacPassageReader.swift */,
+				4E73D1CEC64DA10C45F77D0A /* MacWorkspace.swift */,
+				1E388FD29E46E1F58E951E0C /* MobileWorkspace.swift */,
+				8A9B31E7DFF73CCB1554B7BC /* PlatformUI.swift */,
+			);
+			path = Platform;
+			sourceTree = "<group>";
+		};
+		BC68DF5F6E6296D98C95C3E6 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				AF0CA9EBF771A83CDC8FF419 /* WorkspaceTests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
+		DB8D580F93C2C48E706A4B50 = {
+			isa = PBXGroup;
+			children = (
+				A4380688CF1259021D032F01 /* Brandmarks */,
+				2C89D5A5A2A55610FC00B6F0 /* App */,
+				284811AD4FC46BAA8AAAB2C4 /* MacUITests */,
+				BC68DF5F6E6296D98C95C3E6 /* UITests */,
+				5AAD115DC5E549B06D6BCE6B /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		117A0F0CB9D451DB198A2C80 /* RakazoUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FB062482FDD6A5D138A02F5D /* Build configuration list for PBXNativeTarget "RakazoUITests" */;
+			buildPhases = (
+				9FC0A56C4F1093583B5AB91C /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B822E4B9351651A1AB195010 /* PBXTargetDependency */,
+			);
+			name = RakazoUITests;
+			packageProductDependencies = (
+			);
+			productName = RakazoUITests;
+			productReference = 4E6F2358ABFAA4B4E8DCBD22 /* RakazoUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		1EBC10D2CD0221DCA40CA26E /* RakazoMacUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5A67EBDAEAF144992C69E241 /* Build configuration list for PBXNativeTarget "RakazoMacUITests" */;
+			buildPhases = (
+				88741B60DA19E1420D7576BB /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				88CC1938459AC57E6BD2E0F0 /* PBXTargetDependency */,
+			);
+			name = RakazoMacUITests;
+			packageProductDependencies = (
+			);
+			productName = RakazoMacUITests;
+			productReference = E6BEA9283283939FE4776C9E /* RakazoMacUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		A69118EC3FF384960799CF9B /* RakazoNative */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3FE55609150EBA3CC21610A7 /* Build configuration list for PBXNativeTarget "RakazoNative" */;
+			buildPhases = (
+				37EE89F429C0E26389A87E19 /* Sources */,
+				527C4C6962BFAA53208DCAA6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RakazoNative;
+			packageProductDependencies = (
+			);
+			productName = RakazoNative;
+			productReference = 7A74F90349379A3BE525B90B /* RakazoNative.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		4297686772576464FDB1E364 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					117A0F0CB9D451DB198A2C80 = {
+						TestTargetID = A69118EC3FF384960799CF9B;
+					};
+					1EBC10D2CD0221DCA40CA26E = {
+						TestTargetID = A69118EC3FF384960799CF9B;
+					};
+				};
+			};
+			buildConfigurationList = 0C7A86129D7CE9A8DB64AD46 /* Build configuration list for PBXProject "RakazoNative" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = DB8D580F93C2C48E706A4B50;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 5AAD115DC5E549B06D6BCE6B /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A69118EC3FF384960799CF9B /* RakazoNative */,
+				117A0F0CB9D451DB198A2C80 /* RakazoUITests */,
+				1EBC10D2CD0221DCA40CA26E /* RakazoMacUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		527C4C6962BFAA53208DCAA6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0443E0F0D42F420EF62E6381 /* Assets.xcassets in Resources */,
+				AE6C4AC0AEE12129BB6F097A /* Brandmarks in Resources */,
+				AEFE06CB05D24A0C73F653FA /* sample-catalog.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		37EE89F429C0E26389A87E19 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8C3635DB690A21758DF0D323 /* AgentBlock.swift in Sources */,
+				D33E2765A965357995982629 /* ChatSidebar.swift in Sources */,
+				DD69CCF3B326C78AAA897155 /* CommandPalette.swift in Sources */,
+				73FB6C5F4D23B8AE32B14558 /* ComputerViews.swift in Sources */,
+				72F7C5BB76FA7AFF5B4B28CD /* Connection.swift in Sources */,
+				AED14D5A40BECC59FE9565E0 /* Conversation.swift in Sources */,
+				035E9CF023BB661F3B82C156 /* ConversationAccent.swift in Sources */,
+				3FE74FD746F8EC35B2F97049 /* Design.swift in Sources */,
+				33C7E3CC5F7D44A9FF4F3D3F /* HistorySearch.swift in Sources */,
+				A7C21C13645254EB700BB3A6 /* IntegrationLibrary.swift in Sources */,
+				F550210DE77695617E9919AD /* IntegrationViews.swift in Sources */,
+				2C40450F736AFA57F00B1A98 /* MacCommandQuery.swift in Sources */,
+				24A78C382F665AB2683863A7 /* MacMarketCard.swift in Sources */,
+				061D8418CBF9E157C8CDC924 /* MacMarketInstall.swift in Sources */,
+				928F3B8D934C22B2376A715A /* MacMarketplace.swift in Sources */,
+				7D4E1AAB4E102CB3F0174B4A /* MacPassageReader.swift in Sources */,
+				E22A6E5A37F2EE64A6C9783E /* MacWorkspace.swift in Sources */,
+				946D0DB0C445BBBCFF79892A /* MarketplaceCatalog.swift in Sources */,
+				2317F4ACBED9088DD4CEAB03 /* MessageContent.swift in Sources */,
+				C5AC01709510644AA843AEB1 /* MobileWorkspace.swift in Sources */,
+				0E855941539DE8E24B1AF536 /* Models.swift in Sources */,
+				BCADF6D9EB1FB96C690E34E6 /* Panels.swift in Sources */,
+				03FDB43FF2C39E9894E037FD /* PlatformUI.swift in Sources */,
+				25AE61601BABF49CA7EF2BA1 /* Profile.swift in Sources */,
+				D0798DBF975FAD317BBCA29D /* RakazoApp.swift in Sources */,
+				568729F08181D194EF7A40AB /* Sample.swift in Sources */,
+				93AE6F948FDABCC0198FCC02 /* SampleComputer.swift in Sources */,
+				DCC457AED2D7F48FD67B5C22 /* Shell.swift in Sources */,
+				DFE60755C3C2F84FE3217011 /* Timeline.swift in Sources */,
+				C83E2ADC4BCA0B3649A7B8CE /* WorkspaceStore.swift in Sources */,
+				A919415CBDBF9BF38AF4FF80 /* iOSCommandQuery.swift in Sources */,
+				BEF79ACABB43215B0645B0F5 /* iOSPassageReader.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		88741B60DA19E1420D7576BB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1C67DAF9A380F514248D4854 /* MacWorkspaceTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9FC0A56C4F1093583B5AB91C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				892475DBC0ADF3FA97580EF1 /* WorkspaceTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		88CC1938459AC57E6BD2E0F0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A69118EC3FF384960799CF9B /* RakazoNative */;
+			targetProxy = 45853619165071E4BC7D95F9 /* PBXContainerItemProxy */;
+		};
+		B822E4B9351651A1AB195010 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A69118EC3FF384960799CF9B /* RakazoNative */;
+			targetProxy = C50D6119B2EFE52D2215A8FF /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		25177B2F424747C4C713E071 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.rakazo.nativeclient.uitests;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = RakazoNative;
+			};
+			name = Debug;
+		};
+		5046425A0577D43CEE9CACA9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.rakazo.nativeclient.macpreview.uitests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = RakazoNative;
+			};
+			name = Debug;
+		};
+		51269503E422000DA6C20EBB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_LANGUAGE = en;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		53AE72DED524BB9F236F9385 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.rakazo.nativeclient.macpreview.uitests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = RakazoNative;
+			};
+			name = Release;
+		};
+		BC79032884FF17DA652ED916 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_LANGUAGE = en;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		D6C976CACA5831DEBB641F0B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=macosx*]" = MacIcon;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = Config/RakazoMac.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				"CODE_SIGN_INJECT_BASE_ENTITLEMENTS[sdk=macosx*]" = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Rakazo Native";
+				"INFOPLIST_KEY_CFBundleDisplayName[sdk=macosx*]" = "Rakazo Mac";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.rakazo.nativeclient;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = dev.rakazo.nativeclient.macpreview;
+				PRODUCT_NAME = "Rakazo Native";
+				"PRODUCT_NAME[sdk=macosx*]" = "Rakazo Mac";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		ECCE873AF914A09649A5347F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=macosx*]" = MacIcon;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = Config/RakazoMac.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Rakazo Native";
+				"INFOPLIST_KEY_CFBundleDisplayName[sdk=macosx*]" = "Rakazo Mac";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.rakazo.nativeclient;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = dev.rakazo.nativeclient.macpreview;
+				PRODUCT_NAME = "Rakazo Native";
+				"PRODUCT_NAME[sdk=macosx*]" = "Rakazo Mac";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		FB2BD8EB7D26B6313347AA37 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.rakazo.nativeclient.uitests;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = RakazoNative;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0C7A86129D7CE9A8DB64AD46 /* Build configuration list for PBXProject "RakazoNative" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				51269503E422000DA6C20EBB /* Debug */,
+				BC79032884FF17DA652ED916 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		3FE55609150EBA3CC21610A7 /* Build configuration list for PBXNativeTarget "RakazoNative" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				ECCE873AF914A09649A5347F /* Debug */,
+				D6C976CACA5831DEBB641F0B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5A67EBDAEAF144992C69E241 /* Build configuration list for PBXNativeTarget "RakazoMacUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5046425A0577D43CEE9CACA9 /* Debug */,
+				53AE72DED524BB9F236F9385 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		FB062482FDD6A5D138A02F5D /* Build configuration list for PBXNativeTarget "RakazoUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				25177B2F424747C4C713E071 /* Debug */,
+				FB2BD8EB7D26B6313347AA37 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 4297686772576464FDB1E364 /* Project object */;
+}

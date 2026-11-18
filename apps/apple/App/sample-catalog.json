@@ -1,0 +1,134 @@
+{
+  "apps": [
+    {
+      "slug": "gmail",
+      "name": "Gmail",
+      "noAuth": false,
+      "tools": [
+        {
+          "name": "GMAIL_FETCH_EMAILS",
+          "description": "Fetch email messages from the connected Gmail mailbox"
+        },
+        {
+          "name": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+          "description": "Fetch a single Gmail message by message id"
+        },
+        {
+          "name": "GMAIL_FETCH_MESSAGE_BY_THREAD_ID",
+          "description": "Fetch messages belonging to a Gmail thread"
+        },
+        {
+          "name": "GMAIL_SEND_EMAIL",
+          "description": "Send an email through the connected Gmail account"
+        },
+        {
+          "name": "GMAIL_CREATE_EMAIL_DRAFT",
+          "description": "Create a Gmail draft, optionally as a reply in a thread"
+        },
+        {
+          "name": "GMAIL_LIST_LABELS",
+          "description": "List system and user labels for the connected Gmail account"
+        }
+      ]
+    },
+    {
+      "slug": "googlecalendar",
+      "name": "Google Calendar",
+      "noAuth": false,
+      "tools": [
+        {
+          "name": "GOOGLECALENDAR_EMULATED_ACTION",
+          "description": "Run a deterministic GOOGLECALENDAR action"
+        }
+      ]
+    },
+    {
+      "slug": "googledrive",
+      "name": "Google Drive",
+      "noAuth": false,
+      "tools": [
+        {
+          "name": "GOOGLEDRIVE_EMULATED_ACTION",
+          "description": "Run a deterministic GOOGLEDRIVE action"
+        }
+      ]
+    },
+    {
+      "slug": "slack",
+      "name": "Slack",
+      "noAuth": false,
+      "tools": [
+        {
+          "name": "SLACK_EMULATED_ACTION",
+          "description": "Run a deterministic SLACK action"
+        }
+      ]
+    },
+    {
+      "slug": "github",
+      "name": "GitHub",
+      "noAuth": false,
+      "tools": [
+        {
+          "name": "GITHUB_LIST_RELEASES",
+          "description": "List releases for a GitHub repository (owner + repo). Prefer this over browsing github.com or web search when GitHub is connected."
+        },
+        {
+          "name": "GITHUB_GET_RELEASE",
+          "description": "Get one GitHub release by tag for owner/repo, or the latest release when tag is omitted. Prefer this over a computer browser."
+        }
+      ]
+    },
+    {
+      "slug": "notion",
+      "name": "Notion",
+      "noAuth": false,
+      "tools": [
+        {
+          "name": "NOTION_EMULATED_ACTION",
+          "description": "Run a deterministic NOTION action"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "domain": "asana.com",
+      "surfaces": [
+        "mcp",
+        "openapi"
+      ]
+    },
+    {
+      "domain": "figma.com",
+      "surfaces": [
+        "mcp",
+        "openapi"
+      ]
+    },
+    {
+      "domain": "github.com",
+      "surfaces": [
+        "cli",
+        "graphql",
+        "mcp",
+        "openapi"
+      ]
+    },
+    {
+      "domain": "linear.app",
+      "surfaces": [
+        "cli",
+        "graphql",
+        "mcp"
+      ]
+    },
+    {
+      "domain": "slack.com",
+      "surfaces": [
+        "mcp",
+        "openapi"
+      ]
+    }
+  ]
+}
