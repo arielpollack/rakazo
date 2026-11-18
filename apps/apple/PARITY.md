@@ -1,0 +1,56 @@
+# Rakazo Native: parity ledger
+
+**Not at full parity.** The reference is the installed Rakazo Desktop 0.12.0 and its [release source](https://github.com/elie222/rakazo/tree/v0.12.0). A native label, a recognized block discriminator, a web link, and a working native interaction are four different things.
+
+## Reproduce the inventory
+
+Run `python3 Tools/parity-audit.py /path/to/rakazo v0.12.0` against the original Git checkout. The result includes the commit and individual names, not just totals. The release declares **28 message block kinds** and has **65 Expo route files** after excluding layouts and `+native-intent`. It also has 55 top-level RPC keys. Web paths in `App.tsx` include expressions and feature-gated routes; the script inventories declarations, not every reachable action. None of these counts is a completion percentage.
+
+The fetched [default branch](https://github.com/elie222/rakazo/tree/1dda0afef24e2c9f358abd06d97a1606aeb33a49) declares **29 block kinds, 69 Expo routes and 57 top-level RPC keys**. Compared with the release it adds `tool_question` (native summary and web handoff only) and four mobile routes: chat model, meetings, meeting calendar and meeting transcript. These routes do not have native equivalents here. For desktop behavior check the web UI **and** its Electron host; the Expo app is a separate reference. Re-run `python3 Tools/parity-audit.py ../.. origin/main` after fetching upstream.
+
+## Chat block coverage (release)
+
+| Contract kinds | What happens in the native client | Limit |
+| --- | --- | --- |
+| `text`, `card`, `meta` | Transcript text, Markdown and native selection/copy; long agent responses use the canvas instead of an enclosing bubble. | Not every upstream Markdown or card interaction is reproduced. |
+| `progress`, `steps`, `delivery` | Writing/running indicators; expandable persisted action groups with counts, failures and duration. Internal delivery/activity rows do not become empty bubbles. | No live progress guarantee while disconnected. |
+| `ask`, `choice` | Plain pending questions accept an answer; onboarding choices support choose/dismiss. | Secret, payment, model, and approval interactions are not collected in an ordinary text field. Specialized flows need the original app. |
+| `app_connect`, `connect` | An eligible pending app card opens a scoped authorization review. A generic connection requirement links out. | A live provider grant and completion callback have not been acceptance-tested. |
+| `computer`, `subagent`, `child_bot`, `cloud_agent`, `handoff` | Native action and handoff summaries. Pending computer cards offer an interactive **sample** takeover; with a server they request a run-scoped still and can send Done/Skip. | No native live desktop stream, remote input or cloud-agent management. A still is not a stream. |
+| `channel_message`, `bot_message_sent`, `bot_message_received` | Labeled messages and peer direction where metadata is available. | External channel management, attachment fidelity and full peer navigation are not covered. |
+| `image`, `file`, `chart`, `page`, `app` | Native attachments and export; page titles and links; chart and app summaries. | No native interactive page editor, embedded app, or plotted chart renderer. |
+| `mcp_approval` | Sample cards grant or dismiss access for the requesting bot; the change is visible in the server’s agent list. | Live chat approval/OAuth remains a web handoff. Editing a live server’s bot list in settings is separate. |
+| `voice_call`, `call_request`, `skill_draft`, `import_setup` | Distinct transcript summaries; actionable cards can direct the user to the web conversation. | No native call transport, teaching/editor or import wizard. |
+
+Message actions are separate from block types. Persistent messages have reply, copy/select where text exists, and mark-unread actions. Compatible messages have Rakazo’s six-reaction picker and grouped counts. A selected-text reply carries the original message ID **and** quoted passage to the server. Transient activity does not receive a persistent reply target.
+
+## Application workflows
+
+| Area | Native now | Remaining to call it parity |
+| --- | --- | --- |
+| Shell and discovery | Resizable floating sidebar, compact navigation, search in history, modal ⌘K with chats, pages and actions, per-chat drafts. | Exhaustive upstream command coverage; keyboard, assistive technology and multiwindow acceptance on physical devices. |
+| Chat and runs | History, live updates, attachments, questions, stop, notifications stream while open, activity list and run navigation. | Voice/calls, push, offline delivery, richer composer and specialized cards. |
+| Bots, groups and spaces | Create bots/groups/private spaces, edit bot profile and group members, switch spaces, pin and mark unread. | Bot lifecycle, templates, model/persona/computer settings, sections, organization and membership management. |
+| Connections and permissions | Mac marketplace with direct app, plugin and MCP setup, search, categories, account management and per-bot access. Signed-in paths use provider authorization, digest-confirmed plugin install, or MCP server setup and health checks. iOS retains the existing connections panel. | Hosted provider grants and callbacks, hosted plugin/MCP setup acceptance, full plugin lifecycle, messaging channels, organization policies and vault management. |
+| Routines | Create a paused daily routine; edit name/prompt, activate or pause, paginate history, confirm deletion. Edits preserve original crons and triggers. | Full schedule/trigger editor, run output inspection and end-to-end scheduled firing. |
+| Artifacts, pages, automation and computer | List pages, open pages on the server, inspect computer status; consent, remote review and handback run end to end **in the sample**. | Native page sharing/rendering, artifacts library, boards/tickets, live computer, memory, skills and marketplace. |
+| Identity, settings and administration | Server sign-in, sign-out, space switch, AI-recipient disclosure, appearance. | Password recovery, invites, device/push setup, billing/wallet, usage, security and administrative workflows. |
+
+## What the sample data represents
+
+- **Apps and tools:** six entries from Rakazo’s [Composio emulator](../../packages/adapters/src/providers/integration/composio/composio-fake.ts), including its Gmail/GitHub tool definitions. The four other providers use the emulator’s generic action. Team inbox, Release watch and their permissions are synthetic. These are not anyone’s connected accounts or a list of every production tool.
+- **MCP:** five real public domain/interface listings from [integrations.sh](https://integrations.sh), plus healthy/error/reconnect/installing states from Rakazo’s [MCP agent fixtures](../web/e2e/settings/mcp-agents.spec.ts). Counts and health are examples, not a live probe of those providers. To refresh public metadata explicitly: `node --use-system-ca Tools/sample-catalog.mjs > .build/catalog.next.json && diff -u App/sample-catalog.json .build/catalog.next.json` (recent Node; create `.build` first). Review before replacing. The application itself only reads its bundled JSON.
+- **Bot’s computer → user:** the upstream [computer contract](../../packages/contracts/src/computers/computers-rpc.ts) and [mobile screen](../mobile/app/computer.tsx) distinguish watching from owning an input lease. The native sample models a watch-only screen, one viewer who may edit, dismissal, run-scoped Done/Skip and a resulting bot message. The mock does not provide a network lease, expiration, keyboard/pointer relay, VNC or a remotely running process. Those and disconnected/reconnected sessions require real integration before claiming parity.
+- **User’s Mac → bot:** the [desktop prompt](../web/src/pages/shell/host-computer-prompt.tsx) and [host permission checks](../desktop/src/main/this-computer/computer-permissions.ts) are the separate upstream local-computer path. The native sample starts isolated, simulates separate Accessibility and Screen Recording choices, and supports allow, decline and revoke. Granting access reads only the built-in demo note, never the host or the bot’s virtual screen. No native host bridge or OS permission is requested.
+
+## Verification boundary
+
+`Tools/MarketRenderSmoke.swift` renders the native gallery (light/dark/compact), detail, consent, server catalog, confirmed cards and management in invisible windows, checking visible labels with Vision. It separately exercises the shared quick-action state transitions, persisted sample approvals and workspace isolation. This is not a live provider click-through. `testMarketplaceQuickConnectWithoutOpeningDetails` covers the UI route for an isolated Mac desktop. The release API smoke also loads the real registries and looks up its newly created MCP record in the native marketplace model.
+
+`Tools/SampleFlowSmoke.swift` checks migration of a saved sample, account/card grants, space isolation, repeat actions, failed and stale control attempts, dismissal, handback and refused/revoked host access. Three `WorkspaceTests` simulator journeys cover the interactions listed in the [sample guide](README.md#try-the-sample-integrations-and-computers), including canceling a chat connection, granting access, editing a watched screen after takeover and reading back the bot’s response. These run offline. Mac views can also be rendered offscreen with `Tools/SampleRender.swift`; that is layout evidence, **not** an interactive test on a Mac. The newly added live RPC interactions have not been exercised against a hosted account.
+
+`Tools/ServerSmoke.swift` with `Tools/with-upstream.sh` verifies authentication, scoped chat, attachments, a persisted scripted-worker reply over SSE, reaction retry and counts, quoted reply readback, unread state, group member replacement, page search, connection listing and routine CRUD/history **against the release server**.
+
+`Tools/IntegrationServerSmoke.swift` ran against a disposable **v0.12.0** server and database. The native transport decoded the app catalog/account responses, created and listed a disabled test MCP record, assigned one bot, read back that exact assignment, revoked it and verified removal. `computer/preview` returned no image for an unrelated run. No tool executed, no provider was authorized and no real screen was streamed. This is server readback, not a hosted OAuth or remote-control test.
+
+The direct macOS UI suite exercises native commands, per-chat drafts, selected-text quoting, routine creation entry, Settings, and a sign-in → create bot → send → streamed reply journey against that same disposable server. iPhone simulator tests exercise the shared client including session restore; iPad simulator tests exercise the wide layout. Sample UI tests prove local interactions, not provider functionality. These checks do not establish hosted-account, commercial model, production OAuth, durable Keychain login on the ad-hoc Mac build, physical-device keyboard, push or telephony acceptance. No account or settings migration from Catalyst has been performed.
