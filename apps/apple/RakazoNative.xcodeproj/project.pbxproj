@@ -22,6 +22,7 @@
 		36320D49C2939FDF4F5780E9 /* ComputerDevices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A300B22A5FA7E1526A52B657 /* ComputerDevices.swift */; };
 		3FE74FD746F8EC35B2F97049 /* Design.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D368FC1E4FB2BD1F868DCBA /* Design.swift */; };
 		4617CABA9F66E97A66F7FD32 /* MacManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75D118FE877E46967F855148 /* MacManagement.swift */; };
+		4E9A77C52676198A2DDB941B /* AskCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDE17CCCC3ED52E7816D5DAB /* AskCard.swift */; };
 		568729F08181D194EF7A40AB /* Sample.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E6363880938A03F709E429F /* Sample.swift */; };
 		5C684F0D95036EC5F15FF61C /* MacDeviceRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A7E54376F8D058A71CB4829 /* MacDeviceRunner.swift */; };
 		5E0AE1A6BFA3738DA229056E /* MacHostAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBFCA86B0777B18027A07818 /* MacHostAccess.swift */; };
@@ -138,6 +139,7 @@
 		F5A9C17101ACCD9CF44AE960 /* HistorySearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistorySearch.swift; sourceTree = "<group>"; };
 		F8C5F91FE7F0611F14F1B102 /* PrivateSpaceSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateSpaceSheet.swift; sourceTree = "<group>"; };
 		FBFCA86B0777B18027A07818 /* MacHostAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacHostAccess.swift; sourceTree = "<group>"; };
+		FDE17CCCC3ED52E7816D5DAB /* AskCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskCard.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -153,6 +155,7 @@
 			isa = PBXGroup;
 			children = (
 				2F50277B333FA10B4C6184B1 /* AgentBlock.swift */,
+				FDE17CCCC3ED52E7816D5DAB /* AskCard.swift */,
 				F587A90BCFF4085E47A8D6E7 /* Assets.xcassets */,
 				26EBC8EE1492CDAE6A1BA579 /* AvatarArtwork.swift */,
 				676199275E80E5D8BC5E03A2 /* ChatActivity.swift */,
@@ -358,6 +361,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				8C3635DB690A21758DF0D323 /* AgentBlock.swift in Sources */,
+				4E9A77C52676198A2DDB941B /* AskCard.swift in Sources */,
 				A0CEB7CEDDB27A4409918755 /* AvatarArtwork.swift in Sources */,
 				AE559E305214C63A7FFAC5A4 /* ChatActivity.swift in Sources */,
 				AEAB6AC32E8475D97471DF6D /* ChatActivityRows.swift in Sources */,
