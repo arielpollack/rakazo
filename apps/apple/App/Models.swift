@@ -74,6 +74,8 @@ struct Message: Codable, Identifiable {
   var threadId: String?
   var runId: String?
   var author: Named?
+  /// The voice call this message was spoken in.
+  var callId: String?
   var appearsInTranscript: Bool {
     !blocks.contains { $0.kind == "delivery" } && blocks.contains(where: \.visible)
   }
@@ -98,7 +100,11 @@ struct Message: Codable, Identifiable {
       wrappedValue = []
       while !container.isAtEnd {
         let entry = try container.superDecoder()
-        do { wrappedValue.append(try Block(from: entry)) } catch is DecodingError {
+        do {
+          var block = try Block(from: entry)
+          block.wire = .init(try? JSONValue(from: entry))
+          wrappedValue.append(block)
+        } catch is DecodingError {
           let header = try? BlockHeader(from: entry)
           let kind = header?.kind ?? ""
           wrappedValue.append(Block(kind: ["delivery", "steps"].contains(kind) ? kind : "unsupported_content"))
@@ -110,6 +116,7 @@ struct Message: Codable, Identifiable {
   }
   struct Block: Codable {
     var kind: String
+    var wire: Wire?
     var text: String?
     var name: String?
     var title: String?
@@ -127,7 +134,7 @@ struct Message: Codable, Identifiable {
       description: String?
     var fromBotName: String?, toBotName: String?, fromLabel: String?, fromBotId: String?,
       toBotId: String?, botId: String?
-    var provider: String?, transport: String?, connectorId: String?
+    var provider: String?, transport: String?, connectorId: String?, intent: String?
     var serverId: String?, needsOAuth: Bool?
     var providerLabel: String {
       guard let provider else { return "Chat" }
@@ -211,8 +218,19 @@ struct TranscriptRows {
   static let emoji = ["👍", "👎", "❤️", "😂", "🎉", "😮"]
   var visible: [Message] = []
   var reactions: [String: [String: Int]] = [:]
+  /// Each "messages with another bot" line, by the message that opens it.
+  var exchanges: [String: PeerTranscript.Exchange] = [:]
+  /// An emoji someone sent in reply to a message, which shows as a reaction on it.
+  static func reaction(_ message: Message) -> String? {
+    guard message.role == "user", message.replyToMessageId != nil, message.blocks.count == 1,
+      let block = message.blocks.first, block.kind == "text", let text = block.text,
+      emoji.contains(text)
+    else { return nil }
+    return text
+  }
   init(_ messages: [Message]) {
-    let readable = messages.filter(\.appearsInTranscript)
+    let folded = PeerTranscript.fold(messages.filter(\.appearsInTranscript))
+    let readable = folded.messages
     let parents = Dictionary(readable.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     let answers = Set(
       readable.flatMap {
@@ -220,23 +238,21 @@ struct TranscriptRows {
           $0.kind == "ask" && $0.status == "answered" ? $0.answerMessageId : nil
         }
       })
-    func emoji(_ message: Message) -> String? {
-      guard message.role == "user", message.replyToMessageId != nil, message.blocks.count == 1,
-        let block = message.blocks.first, block.kind == "text", let text = block.text,
-        Self.emoji.contains(text)
-      else { return nil }
-      return text
-    }
+    var shown: [Message] = []
     for message in readable {
-      if !answers.contains(message.id), let mark = emoji(message),
+      if !answers.contains(message.id), let mark = Self.reaction(message),
         let id = message.replyToMessageId,
-        let parent = parents[id], id != message.id, emoji(parent) == nil || answers.contains(id)
+        let parent = parents[id], id != message.id,
+        Self.reaction(parent) == nil || answers.contains(id)
       {
         reactions[id, default: [:]][mark, default: 0] += 1
       } else {
-        visible.append(message)
+        shown.append(message)
       }
     }
+    let lines = PeerTranscript.exchanges(.init(messages: shown, folded: folded.folded))
+    exchanges = lines.lines
+    visible = shown.filter { lines.lineOf[$0.id] == nil || lines.lines[$0.id] != nil }
   }
 }
 struct ThreadData: Codable {

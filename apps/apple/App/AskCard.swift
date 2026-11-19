@@ -14,16 +14,29 @@ struct AskCard: View {
   private var actions: [Message.Block.Action] { block.actions ?? [] }
   private var answered: Bool { block.status == "answered" }
   /// A question the bot asked, as opposed to an action waiting for approval.
-  private var question: Bool {
+  private var question: Bool { Self.isQuestion(block) }
+  private var approval: Bool { Self.isApproval(block) }
+  static func isQuestion(_ block: Message.Block) -> Bool {
     block.approvalEffectId == nil && block.instructionUpdate == nil && block.input != "secret"
       && block.credential == nil && block.oneTimeCode == nil
   }
-  private var approval: Bool {
+  /// Allow and Deny on an action waiting for the person.
+  static func isApproval(_ block: Message.Block) -> Bool {
     guard block.approvalEffectId != nil else { return false }
-    let ids = Set(actions.map(\.id))
+    let ids = Set((block.actions ?? []).map(\.id))
     return ids.contains("allow") && ids.contains("deny")
       && ids.isSubset(of: ["allow", "always", "deny"])
   }
+  private struct InstructionUpdate: Decodable {
+    struct Change: Decodable { let after: String }
+    let instructionUpdate: Change
+  }
+  /// The instructions an update would apply, which the person may edit first.
+  private var instructions: String? {
+    block.fields(InstructionUpdate.self)?.instructionUpdate.after
+  }
+  @State private var editing = false
+  @State private var draft: String?
   private var canAnswer: Bool { !answered && block.expired != true && message.runId != nil }
   private var chosen: Message.Block.Action? {
     guard answered, let answer = block.answer?.trimmingCharacters(in: .whitespaces),
@@ -37,17 +50,19 @@ struct AskCard: View {
     VStack(alignment: .leading, spacing: 0) {
       if let text = block.text {
         Text(verbatim: block.instructionUpdate != nil ? "Update instructions?" : Self.plain(text))
-          .font(TypeRole.message.weight(.medium))
+          .font(CardType.title)
           .foregroundStyle(question && answered ? .secondary : .primary)
           .fixedSize(horizontal: false, vertical: true)
           .textSelection(.enabled)
       }
-      if let detail = block.detail {
+      if let receipt = AskReceipt.of(block) {
+        AskReceiptView(receipt: receipt)
+      } else if let detail = block.detail {
         let code =
           block.detailFormat == "code"
           || (block.detailFormat == nil && block.approvalEffectId != nil)
         Text(verbatim: detail)
-          .font(code ? Self.code : TypeRole.summary)
+          .font(code ? CardType.code : TypeRole.summary)
           .foregroundStyle(
             block.detailFormat == "text" && !(question && answered) ? .primary : .secondary
           )
@@ -65,14 +80,10 @@ struct AskCard: View {
       } else if canAnswer {
         buttons
       } else {
-        Text("No longer active").font(Self.caption).foregroundStyle(.secondary).padding(
+        Text("No longer active").font(CardType.caption).foregroundStyle(.secondary).padding(
           .top, Layout.Space.medium)
       }
-    }.padding(.horizontal, Layout.Space.standard).padding(.vertical, 14)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(
-        Ink.fill, in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-      ).frame(maxWidth: 576, alignment: .leading)
+    }.chatCard()
   }
 
   /// A question's answers, as a list; the one picked keeps a checkmark.
@@ -104,35 +115,43 @@ struct AskCard: View {
     }.padding(.top, Layout.Space.medium)
   }
 
-  /// An approval's choices, Allow first and filled.
+  /// An approval's choices, Allow first and filled. An instructions update adds Edit beside
+  /// Apply, and Apply then sends the edited text.
   private var buttons: some View {
-    HStack(spacing: 6) {
-      ForEach(actions, id: \.id) { action in
-        let primary = action.id == "allow" || action.id == "always"
-        Button {
-          answer(action.id)
-        } label: {
-          HStack(spacing: 6) {
-            if sending == action.id { ProgressView().controlSize(.small) }
-            Text(label(action))
+    VStack(alignment: .leading, spacing: 6) {
+      if editing {
+        TextField(
+          "Instructions", text: Binding(get: { draft ?? instructions ?? "" }, set: { draft = $0 }),
+          axis: .vertical
+        ).textFieldStyle(.plain).lineLimit(3...12).padding(12)
+          .background(Ink.canvas, in: RoundedRectangle(cornerRadius: 12))
+          .accessibilityLabel("Instructions")
+      }
+      HStack(spacing: 6) {
+        ForEach(actions, id: \.id) { action in
+          let primary = action.id == "allow" || action.id == "always"
+          Button {
+            if editing, action.id == "allow", let text = draft ?? instructions,
+              let json = try? JSONSerialization.data(withJSONObject: ["instructions": text]),
+              let value = String(data: json, encoding: .utf8)
+            {
+              answer(value, showing: action.id)
+            } else {
+              answer(action.id)
+            }
+          } label: {
+            HStack(spacing: 6) {
+              if sending == action.id { ProgressView().controlSize(.small) }
+              Text(label(action))
+            }
+          }.buttonStyle(CardButton(primary: primary)).fixedSize().disabled(sending != nil)
+          if action.id == "allow", instructions != nil {
+            Button(editing ? "Cancel" : "Edit") { editing.toggle() }
+              .buttonStyle(CardButton(primary: false)).fixedSize().disabled(sending != nil)
           }
-        }.buttonStyle(Pill(primary: primary)).fixedSize().disabled(sending != nil)
+        }
       }
     }.padding(.top, Layout.Space.medium)
-  }
-
-  /// Filled in ink for the choice that goes ahead, outlined for the others.
-  private struct Pill: ButtonStyle {
-    let primary: Bool
-    @Environment(\.isEnabled) private var enabled
-    func makeBody(configuration: Configuration) -> some View {
-      configuration.label.font(TypeRole.message.weight(.medium))
-        .foregroundStyle(primary ? Ink.canvas : Color.primary)
-        .padding(.horizontal, 16).frame(minHeight: Layout.pointer + 4)
-        .background(primary ? Color.primary : Ink.canvas, in: Capsule())
-        .overlay { if !primary { Capsule().strokeBorder(Ink.line) } }
-        .opacity(configuration.isPressed ? 0.75 : enabled ? 1 : 0.5).contentShape(Capsule())
-    }
   }
 
   private func outcome(_ text: String, color: Color) -> some View {
@@ -175,9 +194,9 @@ struct AskCard: View {
     }
   }
 
-  private func answer(_ choice: String) {
+  private func answer(_ choice: String, showing pressed: String? = nil) {
     guard sending == nil, canAnswer, let api = store.client, let run = message.runId else { return }
-    sending = choice
+    sending = pressed ?? choice
     Task {
       defer { sending = nil }
       do {
@@ -191,13 +210,6 @@ struct AskCard: View {
       } catch { report(error.localizedDescription) }
     }
   }
-
-  // The mobile card's caption sizes, on each platform's own scale.
-  #if os(macOS)
-    static let code = Font.system(size: 12, design: .monospaced), caption = Font.system(size: 12)
-  #else
-    static let code = Font.system(.footnote, design: .monospaced), caption = Font.footnote
-  #endif
 
   /// A title as plain text: names in it were escaped for the web's Markdown.
   static func plain(_ text: String) -> String {
