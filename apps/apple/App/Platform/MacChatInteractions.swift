@@ -32,7 +32,8 @@ struct MacChatActionLayout: SwiftUI.Layout {
   private func measure(_ proposal: ProposedViewSize, _ items: Subviews) -> (CGSize, CGSize) {
     let rail = items[1].sizeThatFits(.unspecified)
     let available = max(1, min(maxContentWidth, (proposal.width ?? .infinity) - rail.width - gap))
-    let contentWidth = min(available, items[0].sizeThatFits(.unspecified).width)
+    // Asked at the width it may take: text hugs its words, a card fills the column.
+    let contentWidth = min(available, items[0].sizeThatFits(.init(width: available, height: nil)).width)
     return (items[0].sizeThatFits(.init(width: contentWidth, height: nil)), rail)
   }
 
