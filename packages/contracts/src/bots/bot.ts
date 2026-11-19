@@ -39,6 +39,9 @@ export const ComputerModelChoiceSchema = z.object({
 });
 export type ComputerModelChoice = z.infer<typeof ComputerModelChoiceSchema>;
 
+/** Error code when a bot cannot move to another computer because it is working or waiting. */
+export const BOT_BUSY_ERROR_CODE = "BOT_BUSY";
+
 export const BotSchema = z.object({
   meetingsEnabled: z.boolean().optional(),
   id: Id,
@@ -153,6 +156,8 @@ export const CreateBotInput = z.object({
   avatarFamily: z.number().int().min(0).max(9).optional(),
   /** Unset follows the deployment's default computer. */
   computerMode: ComputerModeSchema.optional(),
+  /** The owner's paired computer it runs on from the start, greeting included. */
+  computerDeviceId: Id.optional(),
   /** Idempotency key within a space (unique with spaceId). */
   spawnKey: z.string().trim().min(1).max(120).optional(),
 });

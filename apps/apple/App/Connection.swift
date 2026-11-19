@@ -129,7 +129,8 @@ struct Client {
       let details = payload?["json"] as? [String: Any] ?? payload
       throw Failure(
         details?["message"] as? String ?? payload?["error"] as? String
-          ?? "Rakazo returned HTTP \(response.statusCode). Check your server and sign-in.")
+          ?? "Rakazo returned HTTP \(response.statusCode). Check your server and sign-in.",
+        code: details?["code"] as? String)
     }
     return (data, response)
   }

@@ -9,7 +9,11 @@ import type {
 } from "../../computers/host/user-device-protocol.js";
 import { runAgentOnDevice } from "./agent-run-wire.js";
 import type { AgentRunPlacement } from "./user-device-runtime.js";
-import { OWNER_ONLY_DEVICE_MESSAGE, UserDeviceAgentRuntime } from "./user-device-runtime.js";
+import {
+  OWNER_ONLY_DEVICE_MESSAGE,
+  ownerChatRun,
+  UserDeviceAgentRuntime,
+} from "./user-device-runtime.js";
 
 const onDevice: AgentRunPlacement = async () => ({
   userId: "owner",
@@ -116,6 +120,14 @@ const server: AgentRuntime = {
 };
 
 describe("turns of a bot on its owner's computer", () => {
+  it("counts only the owner's own chat turns and the greeting from creating the bot", () => {
+    for (const trigger of ["user", "follow_up", "created"])
+      expect(ownerChatRun({ trigger, userId: "owner" }, "owner")).toBe(true);
+    for (const trigger of ["routine", "channel", "bot_message", "webhook"])
+      expect(ownerChatRun({ trigger, userId: "owner" }, "owner")).toBe(false);
+    expect(ownerChatRun({ trigger: "created", userId: "someone" }, "owner")).toBe(false);
+  });
+
   it("run on the device without the server's credentials, secrets or callbacks", async () => {
     const seen: UserDeviceAgentRun[] = [];
     const runtime = new UserDeviceAgentRuntime(server, link(deviceLoop, seen), onDevice);

@@ -199,6 +199,11 @@ import Foundation
     }
     return bot.computerDeviceId
   }
+  /// Stops every active run in a conversation.
+  func stop(_ chat: Chat) async throws {
+    guard let api = client else { return }
+    let _: Empty = try await api.rpc("threads/stop", chat.target)
+  }
   /// Sets a bot's model; the server checks it is one the bot's computer signs in to.
   func setModel(_ chat: Chat, provider: String, id: String) async throws {
     guard let api = client else { return }
@@ -235,9 +240,9 @@ import Foundation
     }
   }
   func draftKey(_ chat: Chat) -> String { "\(navigation?.current.id ?? "")/\(chat.id)" }
-  func create(name: String, description: String, members: [String]?)
-    async throws
-  {
+  func create(
+    name: String, description: String, members: [String]?, computerDeviceId: String? = nil
+  ) async throws {
     guard let space = navigation?.current.id else { return }
     if var local = sample, let index = local.spaces.firstIndex(where: { $0.id == space }) {
       let id = UUID().uuidString
@@ -257,7 +262,9 @@ import Foundation
       if let members {
         created = try await api.rpc("groups/create", ["name": name, "botIds": members])
       } else {
-        created = try await api.rpc("bots/create", ["name": name, "description": description])
+        var input: [String: Any] = ["name": name, "description": description]
+        if let computerDeviceId { input["computerDeviceId"] = computerDeviceId }
+        created = try await api.rpc("bots/create", input)
       }
       try await load()
       if navigation?.current.id == space { selected = created.id }

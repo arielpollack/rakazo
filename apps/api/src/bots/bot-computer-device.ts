@@ -1,5 +1,6 @@
 import { USER_DEVICE_COMPUTER_KIND } from "@rakazo/adapters";
 import type { Actor, Bot } from "@rakazo/contracts";
+import { BOT_BUSY_ERROR_CODE } from "@rakazo/contracts";
 import { ACTIVE_RUN_STATUSES, ClientError, computerUsingRuns } from "@rakazo/core";
 import { computerScopeKey, IsolationError, runAsSystem } from "@rakazo/db";
 import type { RouterContext } from "../routes/context.js";
@@ -20,16 +21,7 @@ export async function setBotComputerDevice(
   const current = bot.computer.deviceId ?? null;
   if (current === input.deviceId)
     return (await repos.listBots(actor)).find((entry) => entry.id === bot.id)!;
-  if (input.deviceId) {
-    const deviceId = input.deviceId;
-    const device = await runAsSystem("check the computer a bot will run on", () =>
-      deps.prisma.userDevice.findFirst({
-        where: { id: deviceId, userId: actor.userId, revokedAt: null },
-        select: { id: true },
-      }),
-    );
-    if (!device) throw new ClientError("NOT_FOUND", "That computer is no longer connected");
-  }
+  if (input.deviceId) await requireOwnDevice(deps, actor, input.deviceId);
   const claimed = await deps.prisma.bot.updateMany({
     where: { id: bot.id, computerSwitching: false },
     data: { computerSwitching: true },
@@ -40,7 +32,7 @@ export async function setBotComputerDevice(
       where: { botId: bot.id, status: { in: [...ACTIVE_RUN_STATUSES] }, ...computerUsingRuns() },
       select: { id: true },
     });
-    if (active) throw new ClientError("BAD_REQUEST", "Stop the bot first");
+    if (active) throw new ClientError("BAD_REQUEST", "Stop the bot first", BOT_BUSY_ERROR_CODE);
     if (input.deviceId)
       return await repos.setBotComputerDevice(actor, bot.id, {
         id: input.deviceId,
@@ -67,4 +59,19 @@ export async function setBotComputerDevice(
   } finally {
     await deps.prisma.bot.updateMany({ where: { id: bot.id }, data: { computerSwitching: false } });
   }
+}
+
+/** Refuses a computer the person has not paired, or has since removed. */
+export async function requireOwnDevice(
+  deps: Pick<RouterContext["deps"], "prisma">,
+  actor: Actor,
+  deviceId: string,
+): Promise<void> {
+  const device = await runAsSystem("check the computer a bot will run on", () =>
+    deps.prisma.userDevice.findFirst({
+      where: { id: deviceId, userId: actor.userId, revokedAt: null },
+      select: { id: true },
+    }),
+  );
+  if (!device) throw new ClientError("NOT_FOUND", "That computer is no longer connected");
 }

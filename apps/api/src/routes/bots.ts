@@ -73,7 +73,7 @@ import {
   previewAgentImport,
 } from "../bots/agent-import.js";
 import { deleteAgentSecret, listAgentSecrets, putAgentSecret } from "../bots/agent-secrets.js";
-import { setBotComputerDevice } from "../bots/bot-computer-device.js";
+import { requireOwnDevice, setBotComputerDevice } from "../bots/bot-computer-device.js";
 import { loadBotForRemoval } from "../bots/bot-removal.js";
 import { createBotFromTemplate, listBotTemplates } from "../bots/bot-templates.js";
 import { botIntroPrompt } from "../bots/hidden-turns.prompt.js";
@@ -351,8 +351,16 @@ export function botsRoutes(ctx: RouterContext) {
       }),
       create: authed.bots.create.handler(async ({ context, input }) => {
         // Older apps always send Original, which would pin every new bot to it.
-        const { avatarSet: _ignored, ...request } = input;
-        const bot = await repos.createBot(context.actor, request);
+        const { avatarSet: _ignored, computerDeviceId, ...request } = input;
+        if (computerDeviceId) await requireOwnDevice(deps, context.actor, computerDeviceId);
+        let bot = await repos.createBot(context.actor, request);
+        // Moved before its greeting is queued, so the greeting runs on that computer too.
+        if (computerDeviceId) {
+          bot = await setBotComputerDevice(ctx, context.actor, {
+            botId: bot.id,
+            deviceId: computerDeviceId,
+          });
+        }
         await enqueueBotIntroRun(deps, context.actor, bot).catch((error) => {
           getLogger().error("bot intro run enqueue", error);
         });

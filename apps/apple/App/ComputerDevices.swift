@@ -40,6 +40,8 @@ struct RunsOnBox: View {
   @State private var pending: UserDevices.Device?
   @State private var saving = false
   @State private var problem: String?
+  /// Where the bot was asked to move while it was working; moving there first stops it.
+  @State private var blocked: Destination?
   /// What the computer it runs on signs in to; nil until read.
   @State private var models: [ComputerModel]?
   /// The model its next turn uses there, as `provider/id`.
@@ -93,6 +95,14 @@ struct RunsOnBox: View {
         Button("Cancel", role: .cancel) {}
       } message: { device in
         Text("It starts with an empty workspace on \(device.name). Files on its current computer stay there.")
+      }
+      .alert(
+        "Stop \(chat.name) to move it?",
+        isPresented: Binding(get: { blocked != nil }, set: { if !$0 { blocked = nil } }),
+        presenting: blocked
+      ) { destination in
+        Button("Stop and Move", role: .destructive) { stopAndMove(destination.deviceId) }
+        Button("Cancel", role: .cancel) {}
       }
   }
 
@@ -195,9 +205,7 @@ struct RunsOnBox: View {
         defer { saving = false }
         guard let deviceId = await host.allow() else { return }
         try? await store.load()
-        do {
-          current = try await store.setComputerDevice(chat, deviceId: deviceId)
-        } catch { problem = error.localizedDescription }
+        await move(deviceId)
       }
     }
   #endif
@@ -207,9 +215,32 @@ struct RunsOnBox: View {
     problem = nil
     Task {
       defer { saving = false }
+      await move(deviceId)
+    }
+  }
+
+  private func move(_ deviceId: String?) async {
+    do {
+      current = try await store.setComputerDevice(chat, deviceId: deviceId)
+    } catch let failure as Failure where failure.code == "BOT_BUSY" {
+      blocked = Destination(deviceId: deviceId)
+    } catch { problem = error.localizedDescription }
+  }
+
+  private func stopAndMove(_ deviceId: String?) {
+    saving = true
+    problem = nil
+    Task {
+      defer { saving = false }
       do {
-        current = try await store.setComputerDevice(chat, deviceId: deviceId)
+        try await store.stop(chat)
+        await move(deviceId)
       } catch { problem = error.localizedDescription }
     }
+  }
+
+  struct Destination: Identifiable {
+    let deviceId: String?
+    var id: String { deviceId ?? "server" }
   }
 }

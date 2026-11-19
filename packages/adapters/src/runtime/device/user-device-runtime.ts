@@ -15,9 +15,14 @@ import { agentRunForDevice, answerDeviceCall } from "./agent-run-wire.js";
 export const OWNER_ONLY_DEVICE_MESSAGE =
   "This bot works on its owner's own computer, so it works only in their own chats.";
 
-/** A run its owner started by writing in the bot's own chat, not a channel, routine or bot. */
+const OWNER_CHAT_TRIGGERS = new Set(["user", "follow_up", "created"]);
+
+/**
+ * A run its owner started in the bot's own chat, by writing or by creating the bot (its
+ * greeting), not a channel, routine or another bot.
+ */
 export function ownerChatRun(run: { trigger: string; userId: string }, botUserId: string) {
-  return (run.trigger === "user" || run.trigger === "follow_up") && run.userId === botUserId;
+  return OWNER_CHAT_TRIGGERS.has(run.trigger) && run.userId === botUserId;
 }
 
 /** The owner's device a run's turns go to, or null when they run here. */

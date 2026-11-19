@@ -321,7 +321,12 @@ struct Empty: Decodable {}
 struct Health: Decodable { let ok: Bool }
 struct Failure: LocalizedError {
   let message: String
-  init(_ message: String) { self.message = message }
+  /// The server's stable code for a refusal a screen answers, such as `BOT_BUSY`.
+  var code: String? = nil
+  init(_ message: String, code: String? = nil) {
+    self.message = message
+    self.code = code
+  }
   var errorDescription: String? { message }
 }
 

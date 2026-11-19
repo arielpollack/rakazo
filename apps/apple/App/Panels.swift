@@ -10,6 +10,17 @@ struct CreateForm: View {
   @State private var members: Set<String> = []
   @State private var busy = false
   @State private var problem: String?
+  /// The computer a new bot runs on; nil is the server.
+  @State private var runsOn: String?
+  #if os(macOS)
+    @ObservedObject private var host = MacHostAccess.shared
+    private static let thisMac = "this-mac"
+    private var offersThisMac: Bool {
+      host.available && !store.devices.contains { $0.deviceId == host.thisDevice }
+    }
+  #else
+    private let offersThisMac = false
+  #endif
   var title: String {
     kind == .group ? "New group chat" : "New bot"
   }
@@ -21,6 +32,15 @@ struct CreateForm: View {
           Section("Description") {
             TextField("What does this bot help with?", text: $description, axis: .vertical)
               .lineLimit(2...5)
+          }
+          if store.client != nil, offersThisMac || !store.devices.isEmpty {
+            Picker("Runs on", selection: $runsOn) {
+              Text("Rakazo server").tag(String?.none)
+              ForEach(store.devices) { Text($0.name).tag(Optional($0.deviceId)) }
+              #if os(macOS)
+                if offersThisMac { Text("This Mac").tag(Optional(Self.thisMac)) }
+              #endif
+            }.accessibilityIdentifier("newRunsOn")
           }
         }
         if kind == .group {
@@ -57,9 +77,17 @@ struct CreateForm: View {
     Task {
       defer { busy = false }
       do {
+        var device = kind == .bot ? runsOn : nil
+        #if os(macOS)
+          if device == Self.thisMac {
+            // Asks to let bots use this Mac and pairs it; declining creates nothing.
+            guard let paired = await host.allow() else { return }
+            device = paired
+          }
+        #endif
         try await store.create(
           name: name.trimmingCharacters(in: .whitespacesAndNewlines), description: description,
-          members: kind == .group ? Array(members) : nil)
+          members: kind == .group ? Array(members) : nil, computerDeviceId: device)
         finished()
       } catch { problem = error.localizedDescription }
     }
