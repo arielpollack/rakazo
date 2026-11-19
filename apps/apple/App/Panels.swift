@@ -12,6 +12,9 @@ struct CreateForm: View {
   @State private var problem: String?
   /// The computer a new bot runs on; nil is the server.
   @State private var runsOn: String?
+  /// What that computer signs in to, and the model the bot starts with there.
+  @State private var models: [ComputerModel] = []
+  @State private var model: ComputerModel?
   #if os(macOS)
     @ObservedObject private var host = MacHostAccess.shared
     private static let thisMac = "this-mac"
@@ -41,6 +44,12 @@ struct CreateForm: View {
                 if offersThisMac { Text("This Mac").tag(Optional(Self.thisMac)) }
               #endif
             }.accessibilityIdentifier("newRunsOn")
+            if !models.isEmpty {
+              LabeledContent("Model") {
+                ComputerModelMenu(models: models, chosen: model?.key) { model = $0 }
+                  .accessibilityIdentifier("newModel")
+              }
+            }
           }
         }
         if kind == .group {
@@ -70,6 +79,24 @@ struct CreateForm: View {
         }
       }
     }.interactiveDismissDisabled(busy)
+      .task(id: runsOn) { await loadModels() }
+  }
+
+  /// A paired computer reports what it signs in to; a Mac not yet paired starts on its default.
+  private func loadModels() async {
+    models = []
+    model = nil
+    guard let deviceId = runsOn, store.devices.contains(where: { $0.deviceId == deviceId }),
+      let api = store.client
+    else { return }
+    guard
+      let listed: ComputerModels = try? await api.rpc("bots/deviceModels", ["deviceId": deviceId]),
+      !Task.isCancelled
+    else { return }
+    models = listed.models
+    model = listed.current.flatMap { current in
+      listed.models.first { $0.provider == current.provider && $0.id == current.id }
+    }
   }
   func create() {
     busy = true
@@ -87,7 +114,8 @@ struct CreateForm: View {
         #endif
         try await store.create(
           name: name.trimmingCharacters(in: .whitespacesAndNewlines), description: description,
-          members: kind == .group ? Array(members) : nil, computerDeviceId: device)
+          members: kind == .group ? Array(members) : nil, computerDeviceId: device,
+          computerModel: device == runsOn ? model : nil)
         finished()
       } catch { problem = error.localizedDescription }
     }

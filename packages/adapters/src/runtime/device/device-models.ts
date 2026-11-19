@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@rakazo/db";
 import { runAsSystem } from "@rakazo/db";
+import { modelProviderDefinition } from "../../models/model-provider-registry.js";
 import type { BotModelChangeResult } from "../../models/model-selection.js";
 import {
   CLAUDE_CODE_CATALOG_PROVIDER,
@@ -47,9 +48,19 @@ export function deviceModelChoices(providers: readonly string[]): DeviceModelCho
       if (entry.provider === cli.catalog) choices.push(choice(entry, cli.id, cli.name));
   }
   for (const entry of catalog)
-    if (reported.has(entry.provider))
+    if (reported.has(entry.provider) && preferredForm(entry, catalog))
       choices.push(choice(entry, entry.provider, entry.providerName));
   return choices;
+}
+
+/** One id per model where a provider names it several ways: the preferred route, else the plain id. */
+function preferredForm(entry: PiCatalogEntry, catalog: readonly PiCatalogEntry[]): boolean {
+  const routes = modelProviderDefinition(entry.provider)?.routingPrefixes;
+  if (!routes) return true;
+  if (entry.id.startsWith(routes.preferred)) return true;
+  if (routes.others.some((prefix) => entry.id.startsWith(prefix))) return false;
+  const preferred = routes.preferred + entry.id;
+  return !catalog.some((other) => other.provider === entry.provider && other.id === preferred);
 }
 
 /** Why a turn on the device cannot start: it reported no model it signs in to. */

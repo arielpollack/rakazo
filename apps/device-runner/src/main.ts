@@ -2,6 +2,7 @@
 // server open, runs the commands bots send, and runs the whole turn of bots that live here.
 // The app writes one JSON line on stdin, { serverUrl, token, root }, and keeps stdin open:
 // when it closes, the app is gone and so is this process.
+import { mkdir } from "node:fs/promises";
 import { createInterface } from "node:readline";
 import {
   createDeviceAgentRuntime,
@@ -33,6 +34,8 @@ if (!parsed.success) {
   process.exit(2);
 }
 
+// Checks that run from this folder (a signed-in coding CLI) read a missing one as not installed.
+await mkdir(parsed.data.root, { recursive: true });
 mergeShellEnvironment(process.env, await loginShellEnvironment());
 
 const client = startUserDeviceClient({

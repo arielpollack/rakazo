@@ -17,6 +17,7 @@ import type {
   UserDeviceRevokeReason,
 } from "./user-device-protocol.js";
 import {
+  USER_DEVICE_MODELS_HEADER,
   USER_DEVICE_REVOKED_HEADER,
   userDeviceRevokeReason,
   userDeviceServerMessage,
@@ -40,7 +41,7 @@ export interface UserDeviceClientOptions {
   authorize: () => Promise<boolean>;
   /** Runs the whole turn of a bot that lives on this computer, model calls included. */
   agent?: AgentRuntime;
-  /** The model providers this computer signs in to by itself, reported each time it connects. */
+  /** The model providers this computer signs in to by itself, sent with each connect. */
   modelProviders?: () => Promise<string[]>;
   retryMs?: { min: number; max: number };
 }
@@ -90,14 +91,22 @@ export function startUserDeviceClient(options: UserDeviceClientOptions) {
     // Full jitter keeps many devices from reconnecting in lockstep after a server restart.
     const ceiling = Math.min(retry.max, retry.min * 2 ** attempt);
     attempt += 1;
-    reconnectTimer = setTimeout(connect, retry.min / 2 + Math.random() * ceiling);
+    reconnectTimer = setTimeout(() => void connect(), retry.min / 2 + Math.random() * ceiling);
     reconnectTimer.unref();
   }
 
-  function connect() {
+  async function connect() {
+    if (stopped) return;
+    // Listed before connecting: a turn may start the moment the server sees this computer.
+    const providers =
+      options.modelProviders &&
+      (await bestEffort("list this computer's model providers", options.modelProviders()));
     if (stopped) return;
     const ws = new WebSocket(url, {
-      headers: { authorization: `Bearer ${options.token}` },
+      headers: {
+        authorization: `Bearer ${options.token}`,
+        ...(providers && { [USER_DEVICE_MODELS_HEADER]: providers.join(",") }),
+      },
       maxPayload: USER_DEVICE_MAX_MESSAGE_BYTES,
       handshakeTimeout: 15_000,
       followRedirects: false,
@@ -146,7 +155,6 @@ export function startUserDeviceClient(options: UserDeviceClientOptions) {
         ws.ping();
       }, PING_INTERVAL_MS);
       ping.unref();
-      if (options.modelProviders) void reportModels(options.modelProviders);
     });
     ws.on("pong", () => {
       alive = true;
@@ -206,13 +214,6 @@ export function startUserDeviceClient(options: UserDeviceClientOptions) {
       if (message.type === "agent") void handleAgent(message.id, message.run);
       else if (message.type === "request") void handle(message.id, message.request);
     });
-
-    async function reportModels(list: () => Promise<string[]>) {
-      const providers = await bestEffort("list this computer's model providers", list());
-      if (!providers || ws.readyState !== WebSocket.OPEN) return;
-      const message: UserDeviceClientMessage = { type: "models", providers };
-      ws.send(JSON.stringify(message));
-    }
 
     function send(id: string, frame: HostComputerFrame<unknown> | { call: UserDeviceAgentCall }) {
       const entry = calls.get(id);
@@ -329,7 +330,7 @@ export function startUserDeviceClient(options: UserDeviceClientOptions) {
     }
   }
 
-  connect();
+  void connect();
   return { close: stop, cancelAll };
 }
 

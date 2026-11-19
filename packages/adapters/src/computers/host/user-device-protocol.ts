@@ -7,6 +7,22 @@ export const userDeviceRevokeReason = z.enum(["session-ended"]);
 export const USER_DEVICE_REVOKED_HEADER = "x-rakazo-device-revoked";
 export type UserDeviceRevokeReason = z.infer<typeof userDeviceRevokeReason>;
 
+/**
+ * The model providers a computer signs in to by itself, comma-separated, sent with every connect
+ * so the server never sees it online without them. Empty means none; absent leaves them as they were.
+ */
+export const USER_DEVICE_MODELS_HEADER = "x-rakazo-device-models";
+const modelProviders = z
+  .string()
+  .max(4096)
+  .transform((value) => [...new Set(value.split(",").filter(Boolean))])
+  .pipe(z.array(z.string().max(64)).max(64));
+
+/** What a connect said about its model providers; undefined when it said nothing usable. */
+export function deviceModelProvidersHeader(value: string | string[] | undefined) {
+  return modelProviders.safeParse(value).data;
+}
+
 const messageId = z.string().min(1).max(64);
 
 /**
@@ -63,11 +79,6 @@ export const userDeviceServerMessage = z.discriminatedUnion("type", [
  */
 export const userDeviceClientMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("frame"), id: z.string().min(1).max(64), frame: z.unknown() }),
-  /** The model providers this computer signs in to by itself, sent each time it connects. */
-  z.object({
-    type: z.literal("models"),
-    providers: z.array(z.string().min(1).max(64)).max(64),
-  }),
 ]);
 export type UserDeviceClientMessage = z.infer<typeof userDeviceClientMessage>;
 

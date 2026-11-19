@@ -77,6 +77,13 @@ export const botsRpc = {
       .output(BotSchema),
     setComputer: oc.input(z.object({ botId: Id, mode: ComputerModeSchema })).output(BotSchema),
     setComputerDevice: oc.input(z.object({ botId: Id, deviceId: Id.nullable() })).output(BotSchema),
+    /** The models a new bot on this paired computer could use, and the one it would start with. */
+    deviceModels: oc.input(z.object({ deviceId: Id })).output(
+      z.object({
+        models: z.array(ComputerModelChoiceSchema),
+        current: z.object({ provider: z.string(), id: z.string() }).nullable(),
+      }),
+    ),
     /** The models a bot on its owner's computer can use; empty while it runs on the server. */
     computerModels: oc.input(botId).output(
       z.object({

@@ -6,7 +6,7 @@ import type { UserDeviceSummary } from "@rakazo/contracts";
 import { USER_DEVICE_CONNECT_PATH } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import { recordSecurityEvent, runAsSystem } from "@rakazo/db";
-import { bestEffort, getLogger } from "@rakazo/logging";
+import { getLogger } from "@rakazo/logging";
 import { WebSocketServer } from "ws";
 import { z } from "zod";
 import type { HostComputerFrame, HostComputerRequest } from "./host-computer-protocol.js";
@@ -25,6 +25,8 @@ import type {
   UserDeviceRevokeReason,
 } from "./user-device-protocol.js";
 import {
+  deviceModelProvidersHeader,
+  USER_DEVICE_MODELS_HEADER,
   USER_DEVICE_REVOKED_HEADER,
   userDeviceAgentCall,
   userDeviceAgentRun,
@@ -241,7 +243,6 @@ export class UserDeviceHub {
        */
       onPresence?: (device: { id: string; userId: string }, online: boolean) => void;
       /** A device reported which model providers it signs in to. Must not throw. */
-      onModels?: (device: { id: string; userId: string }) => void;
     },
   ) {
     this.address = deps.address;
@@ -309,8 +310,9 @@ export class UserDeviceHub {
       .then(({ device, reason }) => {
         if (!device) return reject(401, "Unauthorized", reason);
         socket.off("error", onError);
+        const models = deviceModelProvidersHeader(request.headers[USER_DEVICE_MODELS_HEADER]);
         this.wss.handleUpgrade(request, socket, head, (ws) => {
-          void this.attach(device, ws).catch((error) => {
+          void this.attach(device, ws, models).catch((error) => {
             getLogger().error("user device attach failed", error);
             ws.close(1011, "Unavailable");
           });
@@ -322,8 +324,15 @@ export class UserDeviceHub {
       });
   };
 
-  /** Registers a connected device socket; a newer socket for the same device replaces the older. */
-  async attach(device: AuthenticatedDevice, socket: UserDeviceSocket): Promise<string> {
+  /**
+   * Registers a connected device socket; a newer socket for the same device replaces the older.
+   * Its model providers are recorded in the same write, so no turn sees it online without them.
+   */
+  async attach(
+    device: AuthenticatedDevice,
+    socket: UserDeviceSocket,
+    modelProviders?: string[],
+  ): Promise<string> {
     const connectionId = randomUUID();
     const entry: LiveDevice = { device, connectionId, socket, pending: new Map(), alive: true };
     const previous = this.live.get(device.id);
@@ -356,7 +365,10 @@ export class UserDeviceHub {
           },
           update: { connectionId, address: this.address, connectedAt: now, heartbeatAt: now },
         });
-        await tx.userDevice.update({ where: { id: device.id }, data: { lastSeenAt: now } });
+        await tx.userDevice.update({
+          where: { id: device.id },
+          data: { lastSeenAt: now, ...(modelProviders && { modelProviders }) },
+        });
       }),
     );
     // A sign-out that revoked this device while it was connecting found no socket to close.
@@ -507,25 +519,7 @@ export class UserDeviceHub {
     }
     const message = userDeviceClientMessage.safeParse(parsed);
     if (!message.success) return;
-    if (message.data.type === "models") {
-      void this.recordModels(entry, message.data.providers);
-      return;
-    }
     entry.pending.get(message.data.id)?.push(message.data.frame, text.length);
-  }
-
-  private async recordModels(entry: LiveDevice, providers: string[]) {
-    const { device } = entry;
-    await bestEffort(
-      "record a user device's model providers",
-      runAsSystem("record a user device's model providers", () =>
-        this.deps.prisma.userDevice.update({
-          where: { id: device.id },
-          data: { modelProviders: [...new Set(providers)] },
-        }),
-      ),
-    );
-    if (this.live.get(device.id) === entry) this.deps.onModels?.(device);
   }
 
   /** Forgets a connection and fails its requests; without a close code the socket is dead and is terminated. */

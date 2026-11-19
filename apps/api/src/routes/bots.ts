@@ -351,9 +351,25 @@ export function botsRoutes(ctx: RouterContext) {
       }),
       create: authed.bots.create.handler(async ({ context, input }) => {
         // Older apps always send Original, which would pin every new bot to it.
-        const { avatarSet: _ignored, computerDeviceId, ...request } = input;
+        const { avatarSet: _ignored, computerDeviceId, computerModel, ...request } = input;
+        if (computerModel && !computerDeviceId)
+          throw new ClientError("BAD_REQUEST", "Choose the computer the model runs on");
         if (computerDeviceId) await requireOwnDevice(deps, context.actor, computerDeviceId);
-        let bot = await repos.createBot(context.actor, request);
+        if (computerDeviceId && computerModel) {
+          const change = await validateDeviceModelChange(deps.prisma, computerDeviceId, {
+            provider: computerModel.provider,
+            model: computerModel.id,
+            current: { provider: null, model: null },
+          });
+          if (!change.ok) throw new ClientError("BAD_REQUEST", change.error);
+        }
+        let bot = await repos.createBot(context.actor, {
+          ...request,
+          ...(computerModel && {
+            modelProvider: computerModel.provider,
+            modelId: computerModel.id,
+          }),
+        });
         // Moved before its greeting is queued, so the greeting runs on that computer too.
         if (computerDeviceId) {
           bot = await setBotComputerDevice(ctx, context.actor, {
@@ -621,6 +637,14 @@ export function botsRoutes(ctx: RouterContext) {
             data: { computerSwitching: false },
           });
         }
+      }),
+      deviceModels: authed.bots.deviceModels.handler(async ({ context, input }) => {
+        await requireOwnDevice(deps, context.actor, input.deviceId);
+        const { models, current } = await deviceBotModels(deps.prisma, input.deviceId, {
+          provider: null,
+          id: null,
+        });
+        return { models, current: current ? { provider: current.provider, id: current.id } : null };
       }),
       setComputerDevice: authed.bots.setComputerDevice.handler(({ context, input }) =>
         setBotComputerDevice(ctx, context.actor, input),

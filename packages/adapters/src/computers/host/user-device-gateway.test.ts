@@ -26,6 +26,7 @@ import {
   userDeviceReplyBody,
   validUserDeviceForwardSecret,
 } from "./user-device-gateway.js";
+import { deviceModelProvidersHeader } from "./user-device-protocol.js";
 
 interface DeviceRow {
   id: string;
@@ -197,10 +198,7 @@ const environment: HostComputerRequest = { method: "environment", botId: "bot-1"
 const secret = userDeviceForwardSecret("test-encryption-key");
 const hubs: UserDeviceHub[] = [];
 
-function setup(
-  onPresence?: (device: { id: string }, online: boolean) => void,
-  onModels?: (device: { id: string }) => void,
-) {
+function setup(onPresence?: (device: { id: string }, online: boolean) => void) {
   const db = fakePrisma();
   db.deviceRows.set(device.id, {
     ...device,
@@ -213,7 +211,6 @@ function setup(
     prisma: db.prisma,
     address: "http://10.0.0.5:3100",
     onPresence,
-    onModels,
   });
   hubs.push(hub);
   const devices = new UserDevices({ prisma: db.prisma, forwardSecret: secret, hub });
@@ -378,15 +375,21 @@ describe("user device gateway in the holding process", () => {
     expect(presence).toHaveLength(3);
   });
 
-  it("records the model providers a device reports and says it changed", async () => {
-    const changed: string[] = [];
-    const { hub, deviceRows } = setup(undefined, (entry) => changed.push(entry.id));
-    const socket = new FakeSocket();
-    await hub.attach(device, socket);
-    const report = { type: "models", providers: ["google-vertex", "cli", "cli"] };
-    socket.emit("message", Buffer.from(JSON.stringify(report)));
-    await vi.waitFor(() => expect(changed).toEqual(["device-1"]));
+  it("records the model providers a device connects with before it is online", async () => {
+    const seen: (string[] | undefined)[] = [];
+    const { hub, deviceRows } = setup(() => seen.push(deviceRows.get(device.id)?.modelProviders));
+    await hub.attach(device, new FakeSocket(), ["google-vertex", "cli"]);
+    expect(seen).toEqual([["google-vertex", "cli"]]);
+    await hub.attach(device, new FakeSocket());
     expect(deviceRows.get(device.id)?.modelProviders).toEqual(["google-vertex", "cli"]);
+  });
+
+  it("reads the model providers a connect sends", () => {
+    expect(deviceModelProvidersHeader("google-vertex,cli,cli")).toEqual(["google-vertex", "cli"]);
+    expect(deviceModelProvidersHeader("")).toEqual([]);
+    expect(deviceModelProvidersHeader(undefined)).toBeUndefined();
+    expect(deviceModelProvidersHeader(["a", "b"])).toBeUndefined();
+    expect(deviceModelProvidersHeader("x".repeat(65))).toBeUndefined();
   });
 
   it("does not report devices offline while the process shuts down", async () => {

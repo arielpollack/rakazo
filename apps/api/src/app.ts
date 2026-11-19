@@ -423,7 +423,6 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
               wakeRunsWaitingForDevice({ prisma, jobs }, device.id),
             );
         },
-        onModels: (device) => void publishRosterChange(realtime, { userIds: [device.userId] }),
       })
     : undefined;
   const userDevices = userDeviceHub

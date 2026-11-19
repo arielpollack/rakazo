@@ -60,6 +60,26 @@ describe("models on a person's own computer", () => {
     expect(none.current).toBeUndefined();
   });
 
+  it("offers one form of each model where a provider routes it several ways", () => {
+    const routed = "amazon-bedrock";
+    const ids = deviceModelChoices([routed]).map((entry) => entry.id);
+    const catalogIds = listPiCatalog()
+      .filter((entry) => entry.provider === routed)
+      .map((entry) => entry.id);
+    const global = catalogIds.find((id) => id.startsWith("global."))!;
+    const plain = global.slice("global.".length);
+    expect(ids).toContain(global);
+    expect(ids).not.toContain(plain);
+    expect(ids.some((id) => /^(us|eu|apac|jp|au|ca|us-gov)\./.test(id))).toBe(false);
+    // A model with no preferred form keeps its plain id.
+    const plainOnly = catalogIds.find(
+      (id) =>
+        !/^(global|us|eu|apac|jp|au|ca|us-gov)\./.test(id) && !catalogIds.includes(`global.${id}`),
+    );
+    expect(plainOnly).toBeDefined();
+    expect(ids).toContain(plainOnly);
+  });
+
   it("allows only models the computer signs in to", async () => {
     const prisma = devicePrisma([cloud]);
     const current = { provider: null, model: null };

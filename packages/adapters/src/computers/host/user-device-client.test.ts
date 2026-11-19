@@ -14,6 +14,7 @@ import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 import type { UserDeviceClient } from "./user-device-client.js";
 import { startUserDeviceClient, USER_DEVICE_MAX_MESSAGE_BYTES } from "./user-device-client.js";
+import { USER_DEVICE_MODELS_HEADER } from "./user-device-protocol.js";
 
 const token = "device-token";
 const nodeEnv: Record<string, string> = process.versions.electron
@@ -59,7 +60,7 @@ describe("user device client", () => {
       }
       wss.handleUpgrade(request, socket, head, (ws) => {
         sockets.push(ws);
-        wss.emit("connection", ws);
+        wss.emit("connection", ws, request);
       });
     });
     await new Promise<void>((resolve) => http.listen(0, "127.0.0.1", resolve));
@@ -182,7 +183,7 @@ describe("user device client", () => {
     ).toEqual([{ type: "text", text: 'tool said "/Users/me"' }]);
   });
 
-  it("reports the model providers it signs in to each time it connects", async () => {
+  it("sends the model providers it signs in to with each connect", async () => {
     client = startUserDeviceClient({
       serverUrl,
       token,
@@ -193,18 +194,13 @@ describe("user device client", () => {
       retryMs: { min: 20, max: 40 },
     });
     const reports: unknown[] = [];
-    wss.on("connection", (ws: WebSocket) =>
-      ws.on("message", (data) => reports.push(JSON.parse(data.toString()))),
+    wss.on("connection", (_ws: WebSocket, request: IncomingMessage) =>
+      reports.push(request.headers[USER_DEVICE_MODELS_HEADER]),
     );
     const first = await connection();
-    await until(() => reports.length === 1);
     first.terminate();
     await connection(1);
-    await until(() => reports.length === 2);
-    expect(reports).toEqual([
-      { type: "models", providers: ["google-vertex", "cli"] },
-      { type: "models", providers: ["google-vertex", "cli"] },
-    ]);
+    expect(reports).toEqual(["google-vertex,cli", "google-vertex,cli"]);
   });
 
   it("refuses a bot's turn when this computer does not run bots", async () => {

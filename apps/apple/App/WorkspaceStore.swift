@@ -261,7 +261,8 @@ import Foundation
   }
   func draftKey(_ chat: Chat) -> String { "\(navigation?.current.id ?? "")/\(chat.id)" }
   func create(
-    name: String, description: String, members: [String]?, computerDeviceId: String? = nil
+    name: String, description: String, members: [String]?, computerDeviceId: String? = nil,
+    computerModel: ComputerModel? = nil
   ) async throws {
     guard let space = navigation?.current.id else { return }
     if var local = sample, let index = local.spaces.firstIndex(where: { $0.id == space }) {
@@ -284,6 +285,9 @@ import Foundation
       } else {
         var input: [String: Any] = ["name": name, "description": description]
         if let computerDeviceId { input["computerDeviceId"] = computerDeviceId }
+        if let computerModel {
+          input["computerModel"] = ["provider": computerModel.provider, "id": computerModel.id]
+        }
         created = try await api.rpc("bots/create", input)
       }
       try await load()

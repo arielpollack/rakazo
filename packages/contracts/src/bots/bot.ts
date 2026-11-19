@@ -158,6 +158,10 @@ export const CreateBotInput = z.object({
   computerMode: ComputerModeSchema.optional(),
   /** The owner's paired computer it runs on from the start, greeting included. */
   computerDeviceId: Id.optional(),
+  /** The model it uses on that computer; only with `computerDeviceId`. Unset uses its default. */
+  computerModel: z
+    .object({ provider: z.string().trim().min(1).max(80), id: z.string().trim().min(1).max(200) })
+    .optional(),
   /** Idempotency key within a space (unique with spaceId). */
   spawnKey: z.string().trim().min(1).max(120).optional(),
 });

@@ -28,6 +28,11 @@ export interface ModelProviderDefinition {
   deployment?: { keyEnv: string; defaultModel: string };
   /** Optional authenticated recovery of a dispatched request. */
   usageLookup?: (apiKey: string) => ModelUsageLookup;
+  /**
+   * Ids that differ only by a routing prefix name one model, such as per-region inference
+   * profiles. A person picks the preferred form, falling back to the plain id without one.
+   */
+  routingPrefixes?: { preferred: string; others: readonly string[] };
   /** Host credentials it can run on instead of a key, e.g. "AWS IAM". */
   hostCredentials?: {
     source: string;
@@ -127,7 +132,14 @@ export const modelProviders = {
   "cloudflare-workers-ai": { recommendedModel: "@cf/openai/gpt-oss-20b" },
   azure: { displayName: "Azure OpenAI" },
   // Also resolves EC2 instance roles through IMDS at request time.
-  "amazon-bedrock": { hostCredentials: { source: "AWS IAM", resolvedAtRequest: true } },
+  "amazon-bedrock": {
+    hostCredentials: { source: "AWS IAM", resolvedAtRequest: true },
+    // Newer models answer only through an inference profile; the global one works from any region.
+    routingPrefixes: {
+      preferred: "global.",
+      others: ["us.", "eu.", "apac.", "jp.", "au.", "ca.", "in.", "us-gov."],
+    },
+  },
   [CLAUDE_CODE_PROVIDER_ID]: {
     hostCredentials: { source: CLAUDE_CODE_CREDENTIAL_SOURCE, resolvedAtRequest: true },
   },

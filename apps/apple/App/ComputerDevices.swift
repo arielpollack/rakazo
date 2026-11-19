@@ -31,6 +31,46 @@ struct ComputerModels: Decodable {
   let current: Current?
 }
 
+/// The models a computer signs in to, a submenu per provider: one cloud alone can offer hundreds.
+struct ComputerModelMenu: View {
+  let models: [ComputerModel]
+  /// The chosen model's `key`.
+  let chosen: String?
+  let pick: (ComputerModel) -> Void
+
+  var body: some View {
+    let names = providers
+    Menu(models.first { $0.key == chosen }?.label ?? "Choose") {
+      if names.count == 1 {
+        buttons(models)
+      } else {
+        ForEach(names, id: \.self) { name in
+          Menu(name) { buttons(models.filter { $0.providerName == name }) }
+        }
+      }
+    }.fixedSize()
+  }
+
+  private var providers: [String] {
+    var seen = Set<String>()
+    return models.map(\.providerName).filter { seen.insert($0).inserted }
+  }
+
+  private func buttons(_ models: [ComputerModel]) -> some View {
+    ForEach(models, id: \.key) { model in
+      Button {
+        pick(model)
+      } label: {
+        if model.key == chosen {
+          Label(model.label, systemImage: "checkmark")
+        } else {
+          Text(model.label)
+        }
+      }
+    }
+  }
+}
+
 /// Where a bot's computer runs: the server or one of the account's paired computers.
 struct RunsOnBox: View {
   @ObservedObject var store: WorkspaceStore
@@ -129,43 +169,15 @@ struct RunsOnBox: View {
     if models.isEmpty {
       LabeledContent("Model", value: "None signed in")
     } else {
-      let names = providers(models)
       LabeledContent("Model") {
-        // A submenu per provider: one cloud alone can offer hundreds of models.
-        Menu(models.first { $0.key == chosenModel }?.label ?? "Choose") {
-          if names.count == 1 {
-            modelButtons(models)
-          } else {
-            ForEach(names, id: \.self) { name in
-              Menu(name) { modelButtons(models.filter { $0.providerName == name }) }
-            }
-          }
-        }.fixedSize().disabled(saving).accessibilityIdentifier("computerModel")
-      }
-    }
-  }
-
-  private func modelButtons(_ models: [ComputerModel]) -> some View {
-    ForEach(models, id: \.key) { model in
-      Button {
-        pick(model)
-      } label: {
-        if model.key == chosenModel {
-          Label(model.label, systemImage: "checkmark")
-        } else {
-          Text(model.label)
-        }
+        ComputerModelMenu(models: models, chosen: chosenModel, pick: pick)
+          .disabled(saving).accessibilityIdentifier("computerModel")
       }
     }
   }
 
   private var reported: String {
     devices.first { $0.deviceId == current }?.modelProviders?.joined(separator: ",") ?? ""
-  }
-
-  private func providers(_ models: [ComputerModel]) -> [String] {
-    var seen = Set<String>()
-    return models.map(\.providerName).filter { seen.insert($0).inserted }
   }
 
   private func pick(_ model: ComputerModel) {
