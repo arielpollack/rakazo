@@ -17,24 +17,15 @@ struct Conversation: View {
   @State private var picking = false
   @State private var reading = false
   @State private var stopping = false
-  @State private var sending = false
   @State private var quote: Message?
   @State private var excerpt: String?
-  @State private var consent: Consent?
-  @State private var pending: Outgoing?
+  @State private var consent: Outbox.ConsentRequest?
+  /// Bumped on each send, to follow it to the end of the transcript.
+  @State private var sentCount = 0
   @State private var reload = 0
   @State private var showLatest = false
   @State private var bottomVisible = true
   @FocusState private var focus: Bool
-  struct Outgoing {
-    let api: Client?
-    let text: String
-    let files: [Upload]
-    let quote: Message?
-    let excerpt: String?
-    let nonce: String
-    let draftKey: String
-  }
   var draft: Binding<String> {
     Binding(
       get: { draftText },
@@ -110,6 +101,12 @@ struct Conversation: View {
                       })
                   }
                 }
+                OutboxRows(
+                  outbox: store.outbox, chat: chat, colors: colors,
+                  width: min(
+                    Layout.readingWidth,
+                    geometry.size.width
+                      * (typeSize.isAccessibilitySize ? 0.92 : compact ? 0.82 : 0.75)))
                 ChatActivityRows(
                   turns: feed.turns, chat: chat, bots: store.navigation?.current.bots ?? [],
                   waiting: store.device(of: chat).flatMap { $0.connected ? nil : "Waiting for \($0.name)" })
@@ -127,8 +124,11 @@ struct Conversation: View {
               .onChange(of: feed.turns) { _, _ in
                 if bottomVisible { proxy.scrollTo("bottom", anchor: .bottom) }
               }
+              .onChange(of: sentCount) { _, _ in
+                DispatchQueue.main.async { proxy.scrollTo("bottom", anchor: .bottom) }
+              }
               .onChange(of: feed.rows.visible.last?.id) { old, _ in
-                if old == nil || bottomVisible || sending {
+                if old == nil || bottomVisible {
                   DispatchQueue.main.async { proxy.scrollTo("bottom", anchor: .bottom) }
                 } else {
                   showLatest = true
@@ -215,17 +215,25 @@ struct Conversation: View {
     } message: {
       Text(feed.problem ?? "")
     }
-    .sheet(item: $consent) { status in
+    .sheet(
+      item: $consent,
+      onDismiss: {
+        if let request = store.outbox.consent, request.chatId == chat.id {
+          store.outbox.decline(request)
+        }
+      }
+    ) { request in
       ConsentView(
-        status: status,
-        cancel: {
-          consent = nil
-          pending = nil
-        },
-        allow: {
-          consent = nil
-          if let outgoing = pending { submit(outgoing, approved: status) }
-        })
+        status: request.status, cancel: { store.outbox.decline(request) },
+        allow: { Task { await store.outbox.allow(request) } })
+    }
+    .onReceive(store.outbox.$consent) { consent = $0?.chatId == chat.id ? $0 : nil }
+    // A sent message leaves the outbox once the transcript shows the server's copy.
+    .onReceive(feed.$items) { items in
+      store.outbox.shown(Set(items.filter { $0.role == "user" }.map(\.seq)), in: chat.id)
+    }
+    .onReceive(store.outbox.delivered.filter { [id = chat.id] in $0 == id }) { _ in
+      Task { _ = try? await feed.refresh(store: store, chat: chat) }
     }
   }
   private var subtitle: String {
@@ -322,26 +330,20 @@ struct Conversation: View {
           }.buttonStyle(.plain).accessibilityLabel("Stop").help("Stop active runs")
         } else {
           Button(action: start) {
-            Group {
-              if sending {
-                ProgressView().controlSize(.small)
-              } else {
-                Image(systemName: "arrow.up").font(
-                  .system(size: compact ? 19 : 16, weight: .semibold))
-              }
-            }.frame(
-              width: compact ? Layout.touch : Layout.pointer,
-              height: compact ? Layout.touch : Layout.pointer
-            ).foregroundStyle(canSend ? colors.text : Color.secondary).background(
-              canSend ? colors.fill : Ink.fill, in: Circle())
+            Image(systemName: "arrow.up").font(.system(size: compact ? 19 : 16, weight: .semibold))
+              .frame(
+                width: compact ? Layout.touch : Layout.pointer,
+                height: compact ? Layout.touch : Layout.pointer
+              ).foregroundStyle(canSend ? colors.text : Color.secondary).background(
+                canSend ? colors.fill : Ink.fill, in: Circle())
           }.buttonStyle(.plain).disabled(!canSend).keyboardShortcut(.return, modifiers: .command)
             .accessibilityLabel("Send").accessibilityIdentifier("send")
         }
       }
-    }.disabled(sending || reading)
+    }.disabled(reading)
   }
   var canSend: Bool {
-    !sending && !reading
+    !reading
       && (!draft.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         || !files.isEmpty)
   }
@@ -379,100 +381,24 @@ struct Conversation: View {
       feed.problem = "Message exceeds 100,000 characters."
       return
     }
-    let key = store.draftKey(chat)
-    let matches =
-      pending.map {
-        $0.text == text && $0.files.map(\.id) == files.map(\.id) && $0.quote?.id == quote?.id
-          && $0.excerpt == excerpt && $0.draftKey == key
-      } ?? false
-    let outgoing =
-      matches
-      ? pending!
-      : Outgoing(
-        api: store.client, text: text, files: files, quote: quote, excerpt: excerpt,
-        nonce: UUID().uuidString,
-        draftKey: key)
-    pending = outgoing
-    submit(outgoing, approved: nil)
-  }
-  func submit(_ outgoing: Outgoing, approved: Consent?) {
-    guard !sending else { return }
-    sending = true
-    // Shown and cleared at once; it comes back to the composer if it isn't sent.
-    let echo =
-      outgoing.api == nil
-      ? nil
-      : feed.show(
-        sending: outgoing.text, files: outgoing.files, reply: outgoing.quote,
-        excerpt: outgoing.excerpt)
-    if echo != nil { clearComposer(outgoing) }
-    func restore() {
-      guard let echo else { return }
-      feed.unsent(echo)
-      draftText = outgoing.text
-      store.drafts[outgoing.draftKey] = outgoing.text
-      files = outgoing.files
-      quote = outgoing.quote
-      excerpt = outgoing.excerpt
-    }
-    Task {
-      defer { sending = false }
+    if let api = store.client {
       do {
-        if let api = outgoing.api {
-          if let approved {
-            let _: Consent = try await api.rpc(
-              "aiConsent/allow",
-              [
-                "scope": approved.scope, "version": approved.version,
-                "keys": approved.unapproved.map(\.key),
-              ])
-          }
-          let status: Consent = try await api.rpc(
-            "aiConsent/status", chat.target.merging(["uses": ["model", "memory"]]) { $1 })
-          if !status.unapproved.isEmpty {
-            restore()
-            consent = status
-            return
-          }
-          var ids = [String]()
-          for file in outgoing.files {
-            let record: ObjectID = try await api.rpc(
-              "artifacts/create",
-              chat.target.merging([
-                "name": file.name, "mimeType": file.mime,
-                "contentBase64": file.data.base64EncodedString(), "clientNonce": file.id,
-              ]) { $1 })
-            ids.append(record.id)
-          }
-          var input = chat.target
-          input["text"] = outgoing.text
-          input["artifactIds"] = ids
-          input["clientNonce"] = outgoing.nonce
-          if let parent = outgoing.quote {
-            input["replyToMessageId"] = parent.id
-            input["replyQuote"] = outgoing.excerpt
-          }
-          let _: Empty = try await api.rpc("threads/send", input)
-        } else {
-          store.demoSend(
-            outgoing.text, files: outgoing.files, chat: chat, reply: outgoing.quote,
-            excerpt: outgoing.excerpt)
-        }
-        if let echo { feed.sent(echo) } else { clearComposer(outgoing) }
-        pending = nil
-        _ = try await feed.refresh(store: store, chat: chat)
+        try store.outbox.send(
+          text, files: files, quote: quote, excerpt: excerpt, chat: chat, api: api)
       } catch {
-        if pending != nil { restore() }
-        if !Task.isCancelled { feed.problem = error.localizedDescription }
+        feed.problem = error.localizedDescription
+        return
       }
+    } else {
+      store.demoSend(text, files: files, chat: chat, reply: quote, excerpt: excerpt)
+      Task { _ = try? await feed.refresh(store: store, chat: chat) }
     }
-  }
-  private func clearComposer(_ outgoing: Outgoing) {
-    store.drafts[outgoing.draftKey] = nil
+    store.drafts[store.draftKey(chat)] = nil
     draftText = ""
     files = []
     quote = nil
     excerpt = nil
+    sentCount += 1
   }
 }
 
