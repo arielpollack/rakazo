@@ -13,6 +13,7 @@ struct ChatSidebar<Title: View, Compose: View>: View {
   @State private var folder = "all"
   @State private var query = ""
   @State private var cursor = 0
+  @State private var deleting: Chat?
   @StateObject private var history = HistorySearch()
   @FocusState private var focused: Bool
   @Environment(\.dynamicTypeSize) private var typeSize
@@ -160,6 +161,10 @@ struct ChatSidebar<Title: View, Compose: View>: View {
                 }
               }
             }
+            if !chat.isGroup {
+              Divider()
+              Button("Delete Bot…", systemImage: "trash", role: .destructive) { deleting = chat }
+            }
           }
         }.listStyle(.plain).scrollContentBackground(.hidden).refreshable { await refresh() }.overlay
         {
@@ -233,6 +238,7 @@ struct ChatSidebar<Title: View, Compose: View>: View {
         query = ""
       }
       .task(id: (workspace?.id ?? "") + "/" + query) { await history.search(query, store: store) }
+      .deleteBotConfirmation(store: store, target: $deleting)
   }
   private func filterOption(_ name: String, id: String) -> some View {
     Button {

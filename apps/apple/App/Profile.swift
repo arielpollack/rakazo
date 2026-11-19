@@ -22,6 +22,7 @@ struct Profile: View {
   @State private var hostOpen = false
   @Environment(\.dynamicTypeSize) private var typeSize
   @State private var reload = 0
+  @State private var deleting: Chat?
   var tabs: [String] {
     chat.isGroup ? ["Members", "Pages"] : ["Computer", "Routines", "Pages", "Advanced"]
   }
@@ -84,6 +85,7 @@ struct Profile: View {
       .sheet(item: $selectedRoutine, onDismiss: { reload += 1 }) { routine in
         RoutineDetails(store: store, chat: chat, routine: routine)
       }
+      .deleteBotConfirmation(store: store, target: $deleting, deleted: close)
   }
   var tabsPicker: some View {
     Picker("Profile tabs", selection: $tab) { ForEach(tabs, id: \.self) { Text($0) } }
@@ -163,6 +165,8 @@ struct Profile: View {
           Text(value).font(.callout).textSelection(.enabled)
         }
         webLink("Manage bot on the web ↗")
+        Button("Delete Bot…", role: .destructive) { deleting = chat }
+          .accessibilityIdentifier("deleteBot")
       }.padding(10)
     }
   }
