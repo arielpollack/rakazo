@@ -1,7 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-
 struct Conversation: View {
   @ObservedObject var store: WorkspaceStore
   let chat: Chat
@@ -68,11 +67,13 @@ struct Conversation: View {
               LazyVStack(spacing: 9) {
                 if feed.older != nil, let api = store.client {
                   Button("Load earlier messages") { Task { await feed.previous(api, chat: chat) } }
-                    .font(.caption).padding(6)
+                    .font(.caption).padding(6).disabled(feed.working)
                 }
                 if feed.loading {
                   ProgressView().padding()
-                } else if feed.items.isEmpty && feed.connection == nil {
+                } else if feed.rows.visible.isEmpty && feed.older == nil && feed.connection == nil
+                  && feed.turns.isEmpty && feed.runFailure == nil
+                {
                   VStack(spacing: 12) {
                     Avatar(chat: chat, size: 72)
                     Text(chat.name).font(.title2.bold())
@@ -83,17 +84,19 @@ struct Conversation: View {
                   }.padding(.top, 65)
                 }
                 ForEach(Array(feed.rows.visible.enumerated()), id: \.element.id) { index, message in
-                  if index == 0 || separated(feed.rows.visible[index - 1], message) {
-                    if let day = Clock.date(message.createdAt) {
-                      Text(day.formatted(.dateTime.month(.wide).day().year())).font(
+                  VStack(spacing: 9) {
+                    if Clock.needsSeparator(
+                      message.createdAt,
+                      after: index == 0 ? nil : feed.rows.visible[index - 1].createdAt)
+                    {
+                      Text(Clock.label(message.createdAt, full: true)).font(
                         .caption.weight(.medium)
                       ).foregroundStyle(.secondary).padding(.vertical, Layout.Space.small)
                     }
-                  }
-                  if feed.previews[message.id] == nil {
                     Bubble(
                       message: message, chat: chat, store: store, outgoingColors: colors,
                       reactions: feed.rows.reactions[message.id] ?? [:],
+                      waitingForUser: feed.turns.contains { $0.id == message.runId && $0.pose == .waiting },
                       reload: { _ = try await feed.refresh(store: store, chat: chat) },
                       report: { feed.problem = $0 },
                       width: min(
@@ -104,37 +107,11 @@ struct Conversation: View {
                         quote = message
                         excerpt = selection
                         focus = true
-                      }
-                    ).id(message.id)
+                      })
                   }
                 }
-                ForEach(feed.previews.keys.sorted(), id: \.self) { key in
-                  if let text = feed.previews[key], !text.isEmpty {
-                    Text(text).font(TypeRole.message).lineSpacing(3).padding(
-                      .vertical, Layout.Space.small
-                    ).frame(maxWidth: .infinity, alignment: .leading)
-                  }
-                }
-                if let run = feed.run,
-                  ["running", "queued", "leased", "waiting_input", "waiting_takeover"].contains(run)
-                {
-                  HStack(spacing: Layout.Space.small) {
-                    ProgressView().controlSize(.small)
-                    Text(
-                      run == "queued"
-                        ? "Queued…"
-                        : run.hasPrefix("waiting")
-                          ? "Waiting for input"
-                          : !feed.previews.isEmpty
-                            ? "Writing…"
-                            : feed.actionLabels.sorted(by: { $0.key < $1.key }).first?.value
-                              ?? "Working…"
-                    ).font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Stop", role: .destructive) { stopping = true }.buttonStyle(.bordered)
-                      .controlSize(.small)
-                  }.padding(.vertical, Layout.Space.small)
-                }
+                ChatActivityRows(
+                  turns: feed.turns, chat: chat, bots: store.navigation?.current.bots ?? [])
                 if let failure = feed.runFailure {
                   Problem(text: failure).frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -146,7 +123,10 @@ struct Conversation: View {
                 .top, Layout.Space.small
               ).padding(.bottom, Layout.Space.small)
             }.defaultScrollAnchor(.bottom).scrollDismissesKeyboard(.interactively)
-              .onChange(of: feed.items.last?.id) { old, _ in
+              .onChange(of: feed.turns) { _, _ in
+                if bottomVisible { proxy.scrollTo("bottom", anchor: .bottom) }
+              }
+              .onChange(of: feed.rows.visible.last?.id) { old, _ in
                 if old == nil || bottomVisible || sending {
                   DispatchQueue.main.async { proxy.scrollTo("bottom", anchor: .bottom) }
                 } else {
@@ -257,11 +237,15 @@ struct Conversation: View {
     #endif
     return Button(action: onProfile) {
       HStack(spacing: Layout.Space.small) {
-        if !compact { Avatar(chat: chat, size: avatarSize) }
+        if !compact {
+          Avatar(
+            chat: chat, size: avatarSize,
+            pose: feed.turns.first(where: { $0.botID == chat.id })?.pose ?? .idle)
+        }
         VStack(alignment: compact ? .center : .leading, spacing: 1) {
           Text(chat.name).font(.headline).lineLimit(1)
           if !typeSize.isAccessibilitySize {
-            Text(feed.run == "running" ? "Working…" : chat.isGroup ? "Group chat" : "Bot").font(
+            Text(chat.isGroup ? "Group chat" : "Bot").font(
               .caption
             ).foregroundStyle(.secondary).lineLimit(1)
           }
@@ -270,12 +254,6 @@ struct Conversation: View {
         .contentShape(Capsule())
     }.buttonStyle(.plain).accessibilityLabel("Open profile for \(chat.name)")
       .accessibilityIdentifier("profile").help("Open conversation profile")
-  }
-  func separated(_ before: Message, _ now: Message) -> Bool {
-    guard let previous = Clock.date(before.createdAt), let next = Clock.date(now.createdAt) else {
-      return false
-    }
-    return !Calendar.current.isDate(previous, inSameDayAs: next)
   }
   private func composer(_ colors: OutgoingColors) -> some View {
     VStack(alignment: .leading, spacing: 6) {
@@ -326,21 +304,33 @@ struct Conversation: View {
             #endif
             return .ignored
           }
-        Button(action: start) {
-          Group {
-            if sending {
-              ProgressView().controlSize(.small)
-            } else {
-              Image(systemName: "arrow.up").font(
-                .system(size: compact ? 19 : 16, weight: .semibold))
-            }
-          }.frame(
-            width: compact ? Layout.touch : Layout.pointer,
-            height: compact ? Layout.touch : Layout.pointer
-          ).foregroundStyle(canSend ? colors.text : Color.secondary).background(
-            canSend ? colors.fill : Ink.fill, in: Circle())
-        }.buttonStyle(.plain).disabled(!canSend).keyboardShortcut(.return, modifiers: .command)
-          .accessibilityLabel("Send").accessibilityIdentifier("send")
+        if !canSend, feed.turns.contains(where: \.canStop) {
+          Button {
+            stopping = true
+          } label: {
+            Image(systemName: "stop.fill").font(.callout).frame(
+              width: compact ? Layout.touch : Layout.pointer,
+              height: compact ? Layout.touch : Layout.pointer
+            )
+            .foregroundStyle(colors.text).background(colors.fill, in: Circle())
+          }.buttonStyle(.plain).accessibilityLabel("Stop").help("Stop active runs")
+        } else {
+          Button(action: start) {
+            Group {
+              if sending {
+                ProgressView().controlSize(.small)
+              } else {
+                Image(systemName: "arrow.up").font(
+                  .system(size: compact ? 19 : 16, weight: .semibold))
+              }
+            }.frame(
+              width: compact ? Layout.touch : Layout.pointer,
+              height: compact ? Layout.touch : Layout.pointer
+            ).foregroundStyle(canSend ? colors.text : Color.secondary).background(
+              canSend ? colors.fill : Ink.fill, in: Circle())
+          }.buttonStyle(.plain).disabled(!canSend).keyboardShortcut(.return, modifiers: .command)
+            .accessibilityLabel("Send").accessibilityIdentifier("send")
+        }
       }
     }.disabled(sending || reading)
   }
@@ -462,6 +452,7 @@ struct Bubble: View {
   @ObservedObject var store: WorkspaceStore
   let outgoingColors: OutgoingColors
   let reactions: [String: Int]
+  let waitingForUser: Bool
   let reload: () async throws -> Void, report: (String) -> Void
   let width: CGFloat
   let reply: (String?) -> Void
@@ -475,8 +466,14 @@ struct Bubble: View {
     !message.id.hasPrefix("progress:") && !message.id.hasPrefix("subagent:")
   }
   private var canReact: Bool { stored && !message.blocks.contains { $0.kind == "channel_message" } }
-  private var prose: Bool {
-    !mine && (message.text.contains("\n") || message.blocks.contains { $0.kind != "text" })
+  private var segments: [[Message.Block]] {
+    message.blocks.filter(\.visible).reduce(into: []) { groups, block in
+      if block.isNarration, groups.last?.last?.isNarration == true {
+        groups[groups.count - 1].append(block)
+      } else {
+        groups.append([block])
+      }
+    }
   }
   var mine: Bool {
     message.role == "user" && (message.author == nil || message.author?.id == store.account?.userId)
@@ -489,40 +486,51 @@ struct Bubble: View {
       {
         Text(name).font(.caption.weight(.medium)).foregroundStyle(.secondary)
       }
-      VStack(alignment: .leading, spacing: 6) {
-        if let quoted = message.replyQuote ?? message.replyPreview?.text {
-          Text(verbatim: quoted).lineLimit(2).font(.caption).padding(7).background(
-            .black.opacity(0.08), in: RoundedRectangle(cornerRadius: 7))
-        }
-        ForEach(Array(message.blocks.filter(\.visible).enumerated()), id: \.offset) { _, block in
-          if ["text", "meta", "progress"].contains(block.kind) {
-            MessageText(content: block.label).equatable()
-          } else if ["file", "image"].contains(block.kind) {
-            AttachmentBlock(block: block, chat: chat, api: store.client)
-          } else if block.kind == "card", let pairs = block.lines {
-            VStack(alignment: .leading, spacing: Layout.Space.small) {
-              ForEach(Array(pairs.enumerated()), id: \.offset) { _, pair in
-                VStack(alignment: .leading, spacing: Layout.Space.tight) {
-                  Text(pair.k).font(.caption.weight(.semibold))
-                  Text(pair.v).textSelection(.enabled)
-                }.accessibilityElement(children: .combine)
-              }
-            }
-          } else {
-            AgentBlock(
-              block: block, message: message, chat: chat, store: store, refresh: reload,
-              report: report)
+      ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
+        let surface = mine || segment.first?.isNarration == true
+        VStack(alignment: .leading, spacing: 6) {
+          if index == 0, let quoted = message.replyQuote ?? message.replyPreview?.text {
+            Text(verbatim: quoted).lineLimit(2).font(.caption).padding(7).background(
+              .black.opacity(0.08), in: RoundedRectangle(cornerRadius: 7))
           }
-        }
-      }.font(TypeRole.message).padding(.horizontal, prose ? 0 : Layout.Space.medium).padding(
-        .vertical, Layout.Space.small
-      ).foregroundStyle(mine ? outgoingColors.text : Color.primary)
-      .tint(mine ? outgoingColors.text : nil).background(
-        mine ? outgoingColors.fill : prose ? .clear : Ink.fill,
-        in: RoundedRectangle(cornerRadius: Layout.Radius.bubble, style: .continuous)
-      ).contextMenu {
-        menuItems
-        if canReact { Menu("React", systemImage: "face.smiling") { emojiButtons } }
+          ForEach(Array(segment.enumerated()), id: \.offset) { _, block in
+            if block.isNarration {
+              MessageText(content: block.label).equatable()
+            } else if ["file", "image"].contains(block.kind) {
+              AttachmentBlock(block: block, chat: chat, api: store.client)
+            } else if block.kind == "card", let pairs = block.lines {
+              VStack(alignment: .leading, spacing: Layout.Space.small) {
+                ForEach(Array(pairs.enumerated()), id: \.offset) { _, pair in
+                  VStack(alignment: .leading, spacing: Layout.Space.tight) {
+                    Text(pair.k).font(.caption.weight(.semibold))
+                    Text(pair.v).textSelection(.enabled)
+                  }.accessibilityElement(children: .combine)
+                }
+              }
+            } else {
+              AgentBlock(
+                block: block, message: message, chat: chat, store: store, refresh: reload,
+                report: report)
+            }
+          }
+        }.font(TypeRole.message).padding(.horizontal, surface ? Layout.bubbleInsetX : 0).padding(
+          .vertical, surface ? Layout.bubbleInsetY : 0
+        ).foregroundStyle(mine ? outgoingColors.text : Color.primary)
+          .tint(mine ? outgoingColors.text : nil).background(
+            mine ? outgoingColors.fill : surface ? Ink.fill : .clear,
+            in: RoundedRectangle(cornerRadius: Layout.Radius.bubble, style: .continuous)
+          )
+          #if os(iOS)
+          .simultaneousGesture(TapGesture(count: 2).onEnded {
+            if reactions["👍"] == nil { react("👍") }
+          }, including: canReact && !waitingForUser && message.blocks.allSatisfy {
+            ["text", "image", "file", "chart", "page"].contains($0.kind)
+          } ? .all : .subviews)
+          #endif
+          .contextMenu {
+            menuItems
+            if canReact { Menu("React", systemImage: "face.smiling") { emojiButtons } }
+          }
       }
       if !reactions.isEmpty {
         ViewThatFits(in: .horizontal) {
@@ -532,12 +540,9 @@ struct Bubble: View {
           }
         }
       }
-      HStack(spacing: 6) {
-        if let date = Clock.date(message.createdAt) {
-          Text(date.formatted(date: .omitted, time: .shortened)).font(TypeRole.timestamp)
-            .accessibilityLabel(date.formatted())
-        }
-        if stored {
+    }.frame(maxWidth: width, alignment: mine ? .trailing : .leading).contentShape(Rectangle())
+      .overlay(alignment: mine ? .topLeading : .topTrailing) {
+        if stored && showsControls {
           HStack(spacing: 2) {
             if canReact {
               Button {
@@ -560,10 +565,9 @@ struct Bubble: View {
             } label: {
               icon("ellipsis")
             }.menuIndicator(.hidden).accessibilityLabel("More message actions")
-          }.buttonStyle(.plain).opacity(showsControls ? 1 : 0).allowsHitTesting(showsControls)
+          }.buttonStyle(.plain).padding(.horizontal, 3).background(.regularMaterial, in: Capsule())
         }
-      }.foregroundStyle(.secondary)
-    }.frame(maxWidth: width, alignment: mine ? .trailing : .leading).contentShape(Rectangle())
+      }
       .onHover { hovering = $0 }
       .frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
       .sheet(isPresented: $selecting) {
@@ -574,7 +578,7 @@ struct Bubble: View {
     #if os(macOS)
       hovering || picker || voiceOver
     #else
-      true
+      false
     #endif
   }
   func icon(_ name: String) -> some View {

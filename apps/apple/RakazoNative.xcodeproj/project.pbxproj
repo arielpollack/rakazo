@@ -32,9 +32,12 @@
 		93AE6F948FDABCC0198FCC02 /* SampleComputer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 749B9F03C07051249FA3F79D /* SampleComputer.swift */; };
 		946D0DB0C445BBBCFF79892A /* MarketplaceCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BE707A7AB369B5B059ABEF0 /* MarketplaceCatalog.swift */; };
 		9E0247D2BF430E0667634201 /* MacServerManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FE08323CE99F10B694586ED /* MacServerManagement.swift */; };
+		A0CEB7CEDDB27A4409918755 /* AvatarArtwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26EBC8EE1492CDAE6A1BA579 /* AvatarArtwork.swift */; };
 		A7C21C13645254EB700BB3A6 /* IntegrationLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71BA637C630CEB24BBBF5EA3 /* IntegrationLibrary.swift */; };
 		A919415CBDBF9BF38AF4FF80 /* iOSCommandQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A4D06DC782EF708BFDB71B8 /* iOSCommandQuery.swift */; };
+		AE559E305214C63A7FFAC5A4 /* ChatActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 676199275E80E5D8BC5E03A2 /* ChatActivity.swift */; };
 		AE6C4AC0AEE12129BB6F097A /* Brandmarks in Resources */ = {isa = PBXBuildFile; fileRef = A4380688CF1259021D032F01 /* Brandmarks */; };
+		AEAB6AC32E8475D97471DF6D /* ChatActivityRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BE24F37CFDAFD7E7E0F29C3 /* ChatActivityRows.swift */; };
 		AED14D5A40BECC59FE9565E0 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74B5501DD8C95153F3ED0C76 /* Conversation.swift */; };
 		AEFE06CB05D24A0C73F653FA /* sample-catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = 81BBFE33A77070F353B93C26 /* sample-catalog.json */; };
 		B6748522ABB023348DB9C8E6 /* MacPluginManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56D9CBCFD084BEB19A1C3AC7 /* MacPluginManagement.swift */; };
@@ -80,6 +83,7 @@
 		19ED9EBDE30E8B7F91E8C292 /* Shell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shell.swift; sourceTree = "<group>"; };
 		1E388FD29E46E1F58E951E0C /* MobileWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileWorkspace.swift; sourceTree = "<group>"; };
 		24C19BD39641F64D45FF5562 /* iOSPassageReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSPassageReader.swift; sourceTree = "<group>"; };
+		26EBC8EE1492CDAE6A1BA579 /* AvatarArtwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarArtwork.swift; sourceTree = "<group>"; };
 		28A74FF1AC9E32C2DB8BE266 /* WorkspaceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStore.swift; sourceTree = "<group>"; };
 		2F50277B333FA10B4C6184B1 /* AgentBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBlock.swift; sourceTree = "<group>"; };
 		305BDDAE63BAB305161B59CC /* PrivateSpace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateSpace.swift; sourceTree = "<group>"; };
@@ -91,6 +95,7 @@
 		5754BD07BE81CDE0D9C489CA /* MacCommandQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacCommandQuery.swift; sourceTree = "<group>"; };
 		5762F995347228EAC589F569 /* IntegrationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationViews.swift; sourceTree = "<group>"; };
 		5BE707A7AB369B5B059ABEF0 /* MarketplaceCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketplaceCatalog.swift; sourceTree = "<group>"; };
+		676199275E80E5D8BC5E03A2 /* ChatActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatActivity.swift; sourceTree = "<group>"; };
 		67D1C0120D0F093BD7A0ACAD /* MacMarketInstall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMarketInstall.swift; sourceTree = "<group>"; };
 		6D368FC1E4FB2BD1F868DCBA /* Design.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Design.swift; sourceTree = "<group>"; };
 		71BA637C630CEB24BBBF5EA3 /* IntegrationLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationLibrary.swift; sourceTree = "<group>"; };
@@ -100,6 +105,7 @@
 		75D118FE877E46967F855148 /* MacManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacManagement.swift; sourceTree = "<group>"; };
 		7A4D06DC782EF708BFDB71B8 /* iOSCommandQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSCommandQuery.swift; sourceTree = "<group>"; };
 		7A74F90349379A3BE525B90B /* RakazoNative.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RakazoNative.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7BE24F37CFDAFD7E7E0F29C3 /* ChatActivityRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatActivityRows.swift; sourceTree = "<group>"; };
 		7EF59F1F8B4ACB7D77CFC049 /* MacWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacWorkspaceTests.swift; sourceTree = "<group>"; };
 		7FE08323CE99F10B694586ED /* MacServerManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacServerManagement.swift; sourceTree = "<group>"; };
 		81BBFE33A77070F353B93C26 /* sample-catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "sample-catalog.json"; sourceTree = "<group>"; };
@@ -138,6 +144,9 @@
 			children = (
 				2F50277B333FA10B4C6184B1 /* AgentBlock.swift */,
 				F587A90BCFF4085E47A8D6E7 /* Assets.xcassets */,
+				26EBC8EE1492CDAE6A1BA579 /* AvatarArtwork.swift */,
+				676199275E80E5D8BC5E03A2 /* ChatActivity.swift */,
+				7BE24F37CFDAFD7E7E0F29C3 /* ChatActivityRows.swift */,
 				90CDC5F0C21E6A74E008D0F5 /* ChatSidebar.swift */,
 				D4AF57D33D82DE8FEF087E3B /* CommandPalette.swift */,
 				18CDBE0724650E990F1FF79E /* ComputerViews.swift */,
@@ -334,6 +343,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				8C3635DB690A21758DF0D323 /* AgentBlock.swift in Sources */,
+				A0CEB7CEDDB27A4409918755 /* AvatarArtwork.swift in Sources */,
+				AE559E305214C63A7FFAC5A4 /* ChatActivity.swift in Sources */,
+				AEAB6AC32E8475D97471DF6D /* ChatActivityRows.swift in Sources */,
 				D33E2765A965357995982629 /* ChatSidebar.swift in Sources */,
 				DD69CCF3B326C78AAA897155 /* CommandPalette.swift in Sources */,
 				73FB6C5F4D23B8AE32B14558 /* ComputerViews.swift in Sources */,

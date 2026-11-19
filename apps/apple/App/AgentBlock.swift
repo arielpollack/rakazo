@@ -79,7 +79,9 @@ struct AgentBlock: View {
           ).font(.callout)
         }.tint(.primary)
       } else {
-        if let body = block.text ?? block.question ?? block.task ?? block.description ?? block.goal
+        if block.kind == "tool_question", let prompt = block.question?.text {
+          Text(verbatim: prompt).textSelection(.enabled)
+        } else if let body = block.text ?? block.question?.text ?? block.task ?? block.description ?? block.goal
           ?? block.farewell ?? block.reason
         {
           MessageText(content: body).equatable()
@@ -130,7 +132,7 @@ struct AgentBlock: View {
             .bordered)
         } else if [
           "app", "page", "chart", "computer", "ask", "tool_question", "connect", "mcp_approval",
-          "import_setup", "skill_draft", "call_request", "cloud_agent",
+          "import_setup", "skill_draft", "call_request", "cloud_agent", "unsupported_content",
         ].contains(block.kind),
           let url = store.link(
             chat, query: block.pageId.map { [.init(name: "page", value: $0)] } ?? [])

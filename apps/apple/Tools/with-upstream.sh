@@ -27,4 +27,16 @@ curl -fsS -H 'Content-Type: application/json' -d '{"json":{}}' "$origin/rpc/heal
 export TEST_RUNNER_RAKAZO_TEST_ORIGIN="$origin" TEST_RUNNER_RAKAZO_TEST_PASSWORD="$(od -An -N8 -tu8 /dev/urandom | tr -d ' ')"
 body=$(jq -nc --arg password "$TEST_RUNNER_RAKAZO_TEST_PASSWORD" '{name:"Native QA",email:"native@example.test",password:$password}')
 curl -fsS -H 'Content-Type: application/json' -H 'Origin: rakazo://' -d "$body" "$origin/api/auth/sign-up/email" >/dev/null
-cd "$root"; "$@"
+cd "$root"
+if [[ ${1:-} == --chat-history ]]; then
+  shift
+  "$@" --seed
+  docker exec -i "$prefix-db" psql -q -v ON_ERROR_STOP=1 -U postgres -d rakazo <<'SQL'
+INSERT INTO messages (id, "threadId", seq, role, blocks, "createdAt")
+SELECT 'hidden-fixture-' || entry, threads.id, 1000 + entry, 'user',
+       '[{"kind":"delivery"},{"kind":"text","text":"Internal fixture input"}]'::jsonb, NOW()
+FROM threads JOIN bots ON bots.id = threads."botId" CROSS JOIN generate_series(1, 510) AS entry
+WHERE bots.name = 'Scout';
+SQL
+fi
+"$@"

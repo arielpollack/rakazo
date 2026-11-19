@@ -179,7 +179,17 @@ final class WorkspaceTests: XCTestCase {
     answer.typeText("Start with the references")
     app.buttons["Send answer"].tap()
     XCTAssertTrue(app.staticTexts["Start with the references"].waitForExistence(timeout: 5))
-    let react = app.buttons.matching(identifier: "React").allElementsBoundByIndex.last!
+    let bubble = app.staticTexts["Start with the references"]
+    func padding() -> XCUICoordinate {
+      bubble.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
+        .withOffset(CGVector(dx: 0, dy: -4))
+    }
+    padding().doubleTap()
+    XCTAssertTrue(app.buttons["👍, 1 reactions"].waitForExistence(timeout: 5))
+    padding().doubleTap()
+    padding().press(forDuration: 0.8)
+    let react = app.buttons["React"]
+    XCTAssertTrue(react.waitForExistence(timeout: 5))
     react.tap()
     let heart = app.buttons["❤️"]
     XCTAssertTrue(heart.waitForExistence(timeout: 5))
@@ -188,6 +198,7 @@ final class WorkspaceTests: XCTestCase {
     XCTAssertTrue(badge.waitForExistence(timeout: 5))
     badge.tap()
     XCTAssertTrue(app.buttons["❤️, 2 reactions"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["👍, 1 reactions"].exists)
   }
 
   func testSampleChatSearchAndProfile() throws {

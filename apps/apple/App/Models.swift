@@ -23,6 +23,7 @@ struct Chat: Codable, Identifiable, Hashable {
     var botId: String?
     var name: String?
     var color: String?
+    var avatarSet: String?
   }
 }
 
@@ -61,7 +62,7 @@ struct Message: Codable, Identifiable {
   var id: String
   var seq: Int
   var role: String
-  var blocks: [Block]
+  @ContentBlocks var blocks: [Block]
   var createdAt: String
   var botId: String?
   var replyPreview: Quote?
@@ -70,10 +71,13 @@ struct Message: Codable, Identifiable {
   var threadId: String?
   var runId: String?
   var author: Named?
-  var text: String { blocks.map(\.label).joined(separator: "\n") }
+  var appearsInTranscript: Bool {
+    !blocks.contains { $0.kind == "delivery" } && blocks.contains(where: \.visible)
+  }
+  var text: String { blocks.filter(\.visible).map(\.label).joined(separator: "\n") }
   var selectableText: String {
     blocks.compactMap { block -> String? in
-      guard let text = block.text, !text.isEmpty else { return nil }
+      guard block.visible, let text = block.text, !text.isEmpty else { return nil }
       switch block.kind {
       case "text", "progress", "ask": return text
       case "channel_message":
@@ -83,12 +87,30 @@ struct Message: Codable, Identifiable {
     }.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
   }
   struct Quote: Codable { var text: String }
+  @propertyWrapper struct ContentBlocks: Codable {
+    var wrappedValue: [Block]
+    init(wrappedValue: [Block]) { self.wrappedValue = wrappedValue }
+    init(from decoder: Decoder) throws {
+      var container = try decoder.unkeyedContainer()
+      wrappedValue = []
+      while !container.isAtEnd {
+        let entry = try container.superDecoder()
+        do { wrappedValue.append(try Block(from: entry)) } catch is DecodingError {
+          let header = try? BlockHeader(from: entry)
+          let kind = header?.kind ?? ""
+          wrappedValue.append(Block(kind: ["delivery", "steps"].contains(kind) ? kind : "unsupported_content"))
+        }
+      }
+    }
+    func encode(to encoder: Encoder) throws { try wrappedValue.encode(to: encoder) }
+    private struct BlockHeader: Decodable { let kind: String }
+  }
   struct Block: Codable {
     var kind: String
     var text: String?
     var name: String?
     var title: String?
-    var question: String?
+    var question: Question?
     var detail: String?
     var artifactId: String?
     var lines: [Pair]?
@@ -119,10 +141,37 @@ struct Message: Codable, Identifiable {
       ][provider] ?? provider
     }
     var activity: Bool?, undone: Bool?, dismissed: Bool?, durationMs: Int?, durationSeconds: Int?
+    var pendingToolNames: [String]?
     var options: [Option]?, actions: [Action]?, steps: [Step]?
     var credential: Presence?, oneTimeCode: Presence?, receipt: Presence?,
       instructionUpdate: Presence?, settingsUpdate: Presence?
     struct Presence: Codable {}
+    enum Question: Codable {
+      case choice(String)
+      case tool(Prompt)
+      struct Prompt: Codable { let message: String }
+      var text: String {
+        switch self {
+        case .choice(let text): text
+        case .tool(let prompt): prompt.message
+        }
+      }
+      init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer()
+        if let text = try? value.decode(String.self) {
+          self = .choice(text)
+        } else {
+          self = .tool(try value.decode(Prompt.self))
+        }
+      }
+      func encode(to encoder: Encoder) throws {
+        var value = encoder.singleValueContainer()
+        switch self {
+        case .choice(let text): try value.encode(text)
+        case .tool(let prompt): try value.encode(prompt)
+        }
+      }
+    }
     struct Option: Codable { let id: String, letter: String, label: String }
     struct Action: Codable { let id: String, label: String }
     struct Step: Codable {
@@ -131,9 +180,10 @@ struct Message: Codable, Identifiable {
     }
     struct Outcomes: Codable { var succeeded: Int?, failed: Int?, stopped: Int? }
     var visible: Bool {
-      !(kind == "progress" && activity == true || kind == "import_setup" && undone == true
+      !(kind == "steps" || kind == "progress" && activity == true || kind == "import_setup" && undone == true
         || kind == "choice" && answerId == "_dismissed")
     }
+    var isNarration: Bool { ["text", "meta", "progress"].contains(kind) }
     var plainQuestion: Bool {
       kind == "ask" && status != "answered" && input != "secret" && approvalEffectId == nil
         && credential == nil && oneTimeCode == nil && receipt == nil && instructionUpdate == nil
@@ -144,7 +194,8 @@ struct Message: Codable, Identifiable {
       var v: String
     }
     var label: String {
-      text ?? title ?? name ?? question ?? lines?.map { "\($0.k): \($0.v)" }.joined(separator: "\n")
+      text ?? title ?? name ?? question?.text ?? lines?.map { "\($0.k): \($0.v)" }.joined(
+        separator: "\n")
         ?? kind.replacingOccurrences(of: "_", with: " ").capitalized
     }
   }
@@ -154,9 +205,7 @@ struct TranscriptRows {
   var visible: [Message] = []
   var reactions: [String: [String: Int]] = [:]
   init(_ messages: [Message]) {
-    let readable = messages.filter {
-      !$0.blocks.contains { $0.kind == "delivery" } && $0.blocks.contains(where: \.visible)
-    }
+    let readable = messages.filter(\.appearsInTranscript)
     let parents = Dictionary(readable.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     let answers = Set(
       readable.flatMap {
@@ -189,9 +238,11 @@ struct ThreadData: Codable {
   var cursor: Int?
   var olderCursor: Int?
   var run: Run?
+  var activeRuns: [Run]?
   struct Run: Codable {
     let status: String
     var error: String?
+    var id: String?, botId: String?, trigger: String?, routineName: String?
   }
 }
 struct Activity: Codable, Identifiable {
@@ -272,6 +323,12 @@ struct Failure: LocalizedError {
 }
 
 enum Clock {
+  static func needsSeparator(_ current: String, after previous: String?) -> Bool {
+    guard let date = date(current) else { return false }
+    guard let previous else { return true }
+    guard let before = Self.date(previous) else { return false }
+    return !Calendar.current.isDate(before, inSameDayAs: date) || date.timeIntervalSince(before) >= 15 * 60
+  }
   static func date(_ value: String?) -> Date? {
     guard let value else { return nil }
     return (try? Date(value, strategy: .iso8601.time(includingFractionalSeconds: true)))
