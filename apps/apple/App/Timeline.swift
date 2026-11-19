@@ -12,6 +12,8 @@ import Foundation
   @Published private(set) var turns: [LiveBotTurn] = []
   private let activity = ChatActivity(art: .shared)
   @Published var connection: String?
+  /// Messages sent from here that the server hasn't returned yet, shown at the end meanwhile.
+  private var sending: [Message] = []
   private var stamp = 0
   func refresh(store: WorkspaceStore, chat: Chat, preserve: Bool = true, reconnect: Bool = false)
     async throws -> Int
@@ -28,7 +30,7 @@ import Foundation
     if preserve, let first = snap.messages.first, items.first?.seq ?? Int.max < first.seq,
       snap.threadId == threadID
     {
-      items = items.filter { $0.seq < first.seq } + snap.messages
+      items = items.filter { $0.seq < first.seq } + snap.messages + sending
     } else {
       if let api, let cursor = snap.olderCursor,
         !snap.messages.contains(where: \.appearsInTranscript)
@@ -41,7 +43,7 @@ import Foundation
         snap.messages.insert(contentsOf: page.messages, at: 0)
         snap.olderCursor = page.olderCursor
       }
-      items = snap.messages
+      items = snap.messages + sending
       older = snap.olderCursor
     }
     threadID = snap.threadId
@@ -52,6 +54,29 @@ import Foundation
     return snap.cursor ?? -1
   }
   private var threadID: String?
+  /// Shows a message the moment it is sent; the server's copy replaces it on the next refresh.
+  func show(sending text: String, files: [Upload], reply: Message?, excerpt: String?) -> String {
+    var message = Sample.message((items.map(\.seq).max() ?? 0) + 1, "user", text)
+    message.id = "sending:" + message.id
+    message.blocks =
+      (text.isEmpty ? [] : message.blocks)
+      + files.map { Message.Block(kind: "file", name: $0.name) }
+    if let reply {
+      message.replyPreview = .init(text: reply.text)
+      message.replyToMessageId = reply.id
+      message.replyQuote = excerpt
+    }
+    sending.append(message)
+    items.append(message)
+    return message.id
+  }
+  /// The server has it: the next refresh shows its copy in place of this one.
+  func sent(_ id: String) { sending.removeAll { $0.id == id } }
+  /// It was not sent: it leaves the transcript.
+  func unsent(_ id: String) {
+    sending.removeAll { $0.id == id }
+    items.removeAll { $0.id == id }
+  }
   private func updateTurns() {
     let next = activity.turns
     if next != turns { turns = next }

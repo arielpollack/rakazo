@@ -76,11 +76,9 @@
     private static let consentKey = "macHost.consent"
 
     var available: Bool { signedIn != nil }
-    /// This Mac's device for the signed-in account, while bots may use it.
-    var thisDevice: String? {
-      guard enabled, let account = signedIn else { return nil }
-      return device(account.origin)?.deviceId
-    }
+    /// This Mac's device for the signed-in account, while bots may use it. Kept here because views
+    /// read it on every redraw and the pairing it comes from is in the Keychain.
+    @Published private(set) var thisDevice: String?
 
     /// Follows the app's sign-in for as long as the app runs.
     func follow(_ session: AppSession) {
@@ -100,6 +98,7 @@
       generation += 1
       disconnect()
       signedIn = next
+      defer { noteDevice() }
       guard let next else {
         enabled = false
         return
@@ -157,6 +156,7 @@
 
     private func connect(_ device: MacHostDevice, _ account: SignedIn) {
       disconnect()
+      noteDevice()
       let origin = account.origin
       let link = MacDeviceRunner(server: account.server, token: device.token, root: Self.root()) {
         [weak self] reason in
@@ -224,6 +224,12 @@
     private func forgetDevice(_ origin: String) {
       memoryDevices[origin] = nil
       MacHostVault.clear(origin)
+      noteDevice()
+    }
+
+    private func noteDevice() {
+      let next = enabled ? signedIn.flatMap { device($0.origin)?.deviceId } : nil
+      if thisDevice != next { thisDevice = next }
     }
 
     private func consent(_ origin: String) -> String? {

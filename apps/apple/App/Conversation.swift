@@ -398,6 +398,23 @@ struct Conversation: View {
   func submit(_ outgoing: Outgoing, approved: Consent?) {
     guard !sending else { return }
     sending = true
+    // Shown and cleared at once; it comes back to the composer if it isn't sent.
+    let echo =
+      outgoing.api == nil
+      ? nil
+      : feed.show(
+        sending: outgoing.text, files: outgoing.files, reply: outgoing.quote,
+        excerpt: outgoing.excerpt)
+    if echo != nil { clearComposer(outgoing) }
+    func restore() {
+      guard let echo else { return }
+      feed.unsent(echo)
+      draftText = outgoing.text
+      store.drafts[outgoing.draftKey] = outgoing.text
+      files = outgoing.files
+      quote = outgoing.quote
+      excerpt = outgoing.excerpt
+    }
     Task {
       defer { sending = false }
       do {
@@ -413,6 +430,7 @@ struct Conversation: View {
           let status: Consent = try await api.rpc(
             "aiConsent/status", chat.target.merging(["uses": ["model", "memory"]]) { $1 })
           if !status.unapproved.isEmpty {
+            restore()
             consent = status
             return
           }
@@ -440,15 +458,21 @@ struct Conversation: View {
             outgoing.text, files: outgoing.files, chat: chat, reply: outgoing.quote,
             excerpt: outgoing.excerpt)
         }
-        store.drafts[outgoing.draftKey] = nil
-        draftText = ""
-        files = []
-        quote = nil
-        excerpt = nil
+        if let echo { feed.sent(echo) } else { clearComposer(outgoing) }
         pending = nil
         _ = try await feed.refresh(store: store, chat: chat)
-      } catch { if !Task.isCancelled { feed.problem = error.localizedDescription } }
+      } catch {
+        if pending != nil { restore() }
+        if !Task.isCancelled { feed.problem = error.localizedDescription }
+      }
     }
+  }
+  private func clearComposer(_ outgoing: Outgoing) {
+    store.drafts[outgoing.draftKey] = nil
+    draftText = ""
+    files = []
+    quote = nil
+    excerpt = nil
   }
 }
 
