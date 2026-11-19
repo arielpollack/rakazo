@@ -57,6 +57,7 @@
 		DD69CCF3B326C78AAA897155 /* CommandPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4AF57D33D82DE8FEF087E3B /* CommandPalette.swift */; };
 		DFE60755C3C2F84FE3217011 /* Timeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 430F82BCC6D96B55E0369863 /* Timeline.swift */; };
 		E22A6E5A37F2EE64A6C9783E /* MacWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E73D1CEC64DA10C45F77D0A /* MacWorkspace.swift */; };
+		F07B280DA1AFE7CA84E2B429 /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A6C24FD85B8161BACF8874 /* Outbox.swift */; };
 		F550210DE77695617E9919AD /* IntegrationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5762F995347228EAC589F569 /* IntegrationViews.swift */; };
 		F623B9EBA1EB8E5D68AAC201 /* ManagedIntegrations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A96C0D1085635BE762149A3 /* ManagedIntegrations.swift */; };
 /* End PBXBuildFile section */
@@ -131,6 +132,7 @@
 		D4AF57D33D82DE8FEF087E3B /* CommandPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPalette.swift; sourceTree = "<group>"; };
 		E6BEA9283283939FE4776C9E /* RakazoMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RakazoMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F1357AB75317CF14B5A8B807 /* Connection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Connection.swift; sourceTree = "<group>"; };
+		F2A6C24FD85B8161BACF8874 /* Outbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Outbox.swift; sourceTree = "<group>"; };
 		F587A90BCFF4085E47A8D6E7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F5A9C17101ACCD9CF44AE960 /* HistorySearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistorySearch.swift; sourceTree = "<group>"; };
 		F8C5F91FE7F0611F14F1B102 /* PrivateSpaceSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateSpaceSheet.swift; sourceTree = "<group>"; };
@@ -170,6 +172,7 @@
 				5BE707A7AB369B5B059ABEF0 /* MarketplaceCatalog.swift */,
 				06BB7B5334DDEEDF2E3147B9 /* MessageContent.swift */,
 				A45C9523887EE04F40E7CAE2 /* Models.swift */,
+				F2A6C24FD85B8161BACF8874 /* Outbox.swift */,
 				995269D4E998FFB60F10F1D6 /* Panels.swift */,
 				305BDDAE63BAB305161B59CC /* PrivateSpace.swift */,
 				F8C5F91FE7F0611F14F1B102 /* PrivateSpaceSheet.swift */,
@@ -385,6 +388,7 @@
 				2317F4ACBED9088DD4CEAB03 /* MessageContent.swift in Sources */,
 				C5AC01709510644AA843AEB1 /* MobileWorkspace.swift in Sources */,
 				0E855941539DE8E24B1AF536 /* Models.swift in Sources */,
+				F07B280DA1AFE7CA84E2B429 /* Outbox.swift in Sources */,
 				BCADF6D9EB1FB96C690E34E6 /* Panels.swift in Sources */,
 				03FDB43FF2C39E9894E037FD /* PlatformUI.swift in Sources */,
 				68DD5089631038866B392A80 /* PrivateSpace.swift in Sources */,

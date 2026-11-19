@@ -67,6 +67,8 @@ import Foundation
 @MainActor final class WorkspaceStore: ObservableObject, Identifiable {
   let id = UUID()
   let login: Login?
+  /// Messages on their way to the server, kept here so leaving a chat doesn't drop them.
+  let outbox = Outbox()
   let persistent: Bool
   @Published var sample: Sample? {
     didSet {
