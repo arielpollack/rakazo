@@ -111,7 +111,7 @@ struct Message: Codable, Identifiable {
     var name: String?
     var title: String?
     var question: Question?
-    var detail: String?
+    var detail: String?, detailFormat: String?, site: String?
     var artifactId: String?
     var lines: [Pair]?
     var mimeType: String?
@@ -140,7 +140,8 @@ struct Message: Codable, Identifiable {
         "lark": "Feishu", "photon": "iMessage (Photon)",
       ][provider] ?? provider
     }
-    var activity: Bool?, undone: Bool?, dismissed: Bool?, durationMs: Int?, durationSeconds: Int?
+    var activity: Bool?, undone: Bool?, dismissed: Bool?, expired: Bool?, durationMs: Int?,
+      durationSeconds: Int?
     var pendingToolNames: [String]?
     var options: [Option]?, actions: [Action]?, steps: [Step]?
     var credential: Presence?, oneTimeCode: Presence?, receipt: Presence?,
@@ -173,7 +174,10 @@ struct Message: Codable, Identifiable {
       }
     }
     struct Option: Codable { let id: String, letter: String, label: String }
-    struct Action: Codable { let id: String, label: String }
+    struct Action: Codable {
+      let id: String, label: String
+      var outcome: String?
+    }
     struct Step: Codable {
       let label: String, count: Int
       var outcomes: Outcomes?

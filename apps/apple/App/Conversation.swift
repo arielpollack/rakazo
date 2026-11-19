@@ -524,6 +524,10 @@ struct Bubble: View {
                   }.accessibilityElement(children: .combine)
                 }
               }
+            } else if block.kind == "ask", block.actions?.isEmpty == false {
+              AskCard(
+                block: block, message: message, chat: chat, store: store, refresh: reload,
+                report: report)
             } else {
               AgentBlock(
                 block: block, message: message, chat: chat, store: store, refresh: reload,
