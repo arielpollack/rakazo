@@ -178,6 +178,26 @@ import Foundation
       if let newRoster { current.members = newRoster }
     }
   }
+  /// Group chats that deleting this bot also removes, since fewer than two bots would remain.
+  func removedGroups(_ chat: Chat) async -> [String] {
+    guard let api = client else { return [] }
+    struct Named: Decodable { let name: String }
+    let groups: [Named]? = try? await api.rpc("bots/removePreview", ["botId": chat.id])
+    return groups?.map(\.name) ?? []
+  }
+  /// Deletes a bot with its conversation, files and routines; its memories stay.
+  func delete(_ chat: Chat) async throws {
+    guard let space = navigation?.current.id else { return }
+    if var local = sample, let index = local.spaces.firstIndex(where: { $0.id == space }) {
+      local.spaces[index].bots.removeAll { $0.id == chat.id }
+      sample = local
+      useSampleSpace(space)
+    } else if let api = client {
+      let _: Empty = try await api.rpc("bots/remove", ["botId": chat.id, "deleteMemories": false])
+      try await load()
+    }
+    if selected == chat.id { selected = nil }
+  }
   func mark(_ chat: Chat, unread: Bool, from messageID: String? = nil) async throws {
     let space = navigation?.current.id
     if let api = client {

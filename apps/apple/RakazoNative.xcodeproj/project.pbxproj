@@ -33,6 +33,7 @@
 		928F3B8D934C22B2376A715A /* MacMarketplace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF131DFE3747D0889852FAD7 /* MacMarketplace.swift */; };
 		93AE6F948FDABCC0198FCC02 /* SampleComputer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 749B9F03C07051249FA3F79D /* SampleComputer.swift */; };
 		946D0DB0C445BBBCFF79892A /* MarketplaceCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BE707A7AB369B5B059ABEF0 /* MarketplaceCatalog.swift */; };
+		9C62E9AD657EA1166F82648D /* DeleteBot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87782766E9B76935B89151BA /* DeleteBot.swift */; };
 		9E0247D2BF430E0667634201 /* MacServerManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FE08323CE99F10B694586ED /* MacServerManagement.swift */; };
 		A0CEB7CEDDB27A4409918755 /* AvatarArtwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26EBC8EE1492CDAE6A1BA579 /* AvatarArtwork.swift */; };
 		A7C21C13645254EB700BB3A6 /* IntegrationLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71BA637C630CEB24BBBF5EA3 /* IntegrationLibrary.swift */; };
@@ -111,6 +112,7 @@
 		7EF59F1F8B4ACB7D77CFC049 /* MacWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacWorkspaceTests.swift; sourceTree = "<group>"; };
 		7FE08323CE99F10B694586ED /* MacServerManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacServerManagement.swift; sourceTree = "<group>"; };
 		81BBFE33A77070F353B93C26 /* sample-catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "sample-catalog.json"; sourceTree = "<group>"; };
+		87782766E9B76935B89151BA /* DeleteBot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteBot.swift; sourceTree = "<group>"; };
 		8A9B31E7DFF73CCB1554B7BC /* PlatformUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformUI.swift; sourceTree = "<group>"; };
 		8E00A5B558C6A92EE667C916 /* MacMarketCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMarketCard.swift; sourceTree = "<group>"; };
 		8EB85D32BE86E522174533B5 /* MacAppManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacAppManagement.swift; sourceTree = "<group>"; };
@@ -158,6 +160,7 @@
 				F1357AB75317CF14B5A8B807 /* Connection.swift */,
 				74B5501DD8C95153F3ED0C76 /* Conversation.swift */,
 				AE08CD0F7561B3525F937972 /* ConversationAccent.swift */,
+				87782766E9B76935B89151BA /* DeleteBot.swift */,
 				6D368FC1E4FB2BD1F868DCBA /* Design.swift */,
 				F5A9C17101ACCD9CF44AE960 /* HistorySearch.swift */,
 				71BA637C630CEB24BBBF5EA3 /* IntegrationLibrary.swift */,
@@ -359,6 +362,7 @@
 				72F7C5BB76FA7AFF5B4B28CD /* Connection.swift in Sources */,
 				AED14D5A40BECC59FE9565E0 /* Conversation.swift in Sources */,
 				035E9CF023BB661F3B82C156 /* ConversationAccent.swift in Sources */,
+				9C62E9AD657EA1166F82648D /* DeleteBot.swift in Sources */,
 				3FE74FD746F8EC35B2F97049 /* Design.swift in Sources */,
 				33C7E3CC5F7D44A9FF4F3D3F /* HistorySearch.swift in Sources */,
 				A7C21C13645254EB700BB3A6 /* IntegrationLibrary.swift in Sources */,
