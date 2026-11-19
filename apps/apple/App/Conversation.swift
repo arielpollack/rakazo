@@ -12,10 +12,11 @@ struct Conversation: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.dynamicTypeSize) private var typeSize
   @Environment(\.colorSchemeContrast) private var contrast
-  @State private var files: [Upload] = []
+  @StateObject private var attachments = ChatAttachments()
+  @State private var fileTargeted = false
+  @State private var unreadMarker: String?
   @State private var draftText = ""
   @State private var picking = false
-  @State private var reading = false
   @State private var stopping = false
   @State private var sending = false
   @State private var quote: Message?
@@ -26,6 +27,10 @@ struct Conversation: View {
   @State private var showLatest = false
   @State private var bottomVisible = true
   @FocusState private var focus: Bool
+  #if os(macOS)
+  @State private var composerFocusRequest = 0
+  private var acceptsFiles: Bool { !sending && !attachments.reading && !picking && consent == nil }
+  #endif
   struct Outgoing {
     let api: Client?
     let text: String
@@ -40,7 +45,7 @@ struct Conversation: View {
       get: { draftText },
       set: {
         draftText = $0
-        store.drafts[store.draftKey(chat)] = $0
+        store.drafts[store.draftKey(chat)] = $0.isEmpty ? nil : $0
       })
   }
   var body: some View {
@@ -97,6 +102,7 @@ struct Conversation: View {
                       message: message, chat: chat, store: store, outgoingColors: colors,
                       reactions: feed.rows.reactions[message.id] ?? [:],
                       waitingForUser: feed.turns.contains { $0.id == message.runId && $0.pose == .waiting },
+                      unreadMarker: $unreadMarker,
                       reload: { _ = try await feed.refresh(store: store, chat: chat) },
                       report: { feed.problem = $0 },
                       width: min(
@@ -106,7 +112,11 @@ struct Conversation: View {
                       reply: { selection in
                         quote = message
                         excerpt = selection
+                        #if os(macOS)
+                        composerFocusRequest += 1
+                        #else
                         focus = true
+                        #endif
                       })
                   }
                 }
@@ -151,7 +161,12 @@ struct Conversation: View {
             Button("Retry") { reload += 1 }.font(.caption)
           }.padding(5)
         }
-        composer(colors).frame(maxWidth: Layout.readingWidth + 204).padding(
+        ZStack(alignment: .bottom) {
+          composer(colors).opacity(fileTargeted ? 0 : 1)
+          #if os(macOS)
+            if fileTargeted { MacFileDropCue(name: chat.name).allowsHitTesting(false) }
+          #endif
+        }.frame(maxWidth: Layout.readingWidth + 204).padding(
           .horizontal, Layout.Space.medium
         ).padding(.vertical, Layout.Space.small).frame(maxWidth: .infinity)
       }
@@ -160,14 +175,22 @@ struct Conversation: View {
           if compact { ToolbarItem(placement: .principal) { profileButton } }
         #endif
       }
-    }.onAppear { draftText = store.drafts[store.draftKey(chat)] ?? "" }.task(
+    }
+    #if os(macOS)
+    .contentShape(Rectangle())
+    .onDrop(of: [.fileURL], delegate: MacChatFileDrop(targeted: $fileTargeted,
+      enabled: acceptsFiles,
+      receive: { MacChatFileDrop.stage($0, in: attachments, limits: .init(account: store.account)) }))
+    #endif
+    .onDisappear { fileTargeted = false; attachments.cancelRead() }
+    .onAppear { draftText = store.drafts[store.draftKey(chat)] ?? "" }.task(
       id: "\(reload)-\(phase == .active)"
     ) { if phase == .active { await feed.observe(store: store, chat: chat) } }
     .onChange(of: store.sample?.computers?[chat.id]?.pendingRun) { _, _ in
       Task { _ = try? await feed.refresh(store: store, chat: chat) }
     }
     .task(id: phase) {
-      if phase == .active, chat.unread == true { try? await store.mark(chat, unread: false) }
+      if phase == .active, chat.unread == true, unreadMarker == nil { try? await store.mark(chat, unread: false) }
     }
     .confirmationDialog(
       "Stop the active runs in this conversation?", isPresented: $stopping,
@@ -185,25 +208,13 @@ struct Conversation: View {
     }
     .fileImporter(
       isPresented: $picking,
-      allowedContentTypes: [
-        .image, .pdf, .plainText, .commaSeparatedText, .json, .zip, .audio, .movie,
-      ], allowsMultipleSelection: true
+      allowedContentTypes: ChatAttachments.pickerTypes, allowsMultipleSelection: true
     ) { result in
-      Task {
-        reading = true
-        defer { reading = false }
-        do {
-          let urls = try result.get()
-          let staged = try await Self.readFiles(
-            urls, count: files.count, bytes: files.reduce(0, { $0 + $1.data.count }),
-            maxCount: min(store.account?.maxAttachmentsPerMessage ?? 5, 10),
-            maxBytes: min(store.account?.maxUploadSizeBytes ?? 8_000_000, 16_000_000))
-          files += staged
-        } catch {
-          if (error as NSError).code != NSUserCancelledError {
-            feed.problem = error.localizedDescription
-          }
-        }
+      switch result {
+      case .success(let urls):
+        stage(urls)
+      case .failure(let error):
+        if (error as NSError).code != NSUserCancelledError { attachments.problem = error.localizedDescription }
       }
     }
     .alert(
@@ -256,54 +267,79 @@ struct Conversation: View {
       .accessibilityIdentifier("profile").help("Open conversation profile")
   }
   private func composer(_ colors: OutgoingColors) -> some View {
-    VStack(alignment: .leading, spacing: 6) {
+    #if os(macOS)
+    let spacing: CGFloat = 12
+    #else
+    let spacing: CGFloat = 6
+    #endif
+    return VStack(alignment: .leading, spacing: spacing) {
       if let quote {
-        HStack {
-          Image(systemName: "arrowshape.turn.up.left")
-          Text(excerpt ?? quote.text).lineLimit(1)
+        HStack(spacing: Layout.Space.small) {
+          RoundedRectangle(cornerRadius: 2).fill(chat.tint).frame(width: 3)
+          VStack(alignment: .leading, spacing: 2) {
+            Text(quote.role == "user" ? (quote.author?.name ?? "You")
+              : (store.navigation?.current.bots.first { $0.id == quote.botId }?.name ?? chat.name))
+              .font(.caption.weight(.semibold))
+            Text(verbatim: excerpt ?? quote.text).font(.caption).lineLimit(1).foregroundStyle(.secondary)
+          }
           Spacer()
           Glyph(icon: "xmark", label: "Cancel reply") {
             self.quote = nil
             excerpt = nil
           }
-        }.font(.caption).padding(.horizontal, 8)
+        }.fixedSize(horizontal: false, vertical: true).padding(.horizontal, 8)
       }
-      if !files.isEmpty {
+      if let problem = attachments.problem {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+          Image(systemName: "exclamationmark.circle").accessibilityHidden(true)
+          Text(verbatim: problem).textSelection(.enabled)
+          Spacer(minLength: 0)
+          Button { attachments.problem = nil } label: { Image(systemName: "xmark") }
+            .buttonStyle(.plain).accessibilityLabel("Dismiss attachment error")
+        }.font(.caption).foregroundStyle(.secondary).padding(.horizontal, 6)
+      }
+      if !attachments.files.isEmpty {
         ScrollView(.horizontal) {
-          HStack {
-            ForEach(files) { file in
+          HStack(spacing: Layout.Space.small) {
+            ForEach(attachments.files) { file in
+              #if os(macOS)
+              MacAttachmentToken(file: file) { attachments.remove(file) }
+              #else
               Button {
-                files.removeAll { $0.id == file.id }
+                attachments.remove(file)
               } label: {
                 Label(file.name, systemImage: "paperclip").lineLimit(1)
                 Image(systemName: "xmark.circle.fill")
-              }.buttonStyle(.bordered).font(.caption)
+              }.buttonStyle(.bordered).font(.caption).accessibilityLabel("Remove \(file.name)")
+              #endif
             }
           }
-        }
+        }.scrollIndicators(.hidden)
       }
-      HStack(alignment: .bottom, spacing: Layout.Space.small) {
+      HStack(alignment: .bottom, spacing: composerControlSpacing) {
         Glyph(
           icon: "paperclip", label: "Attach file", size: compact ? Layout.touch : Layout.pointer
         ) {
           picking = true
-        }
-        TextField("Message \(chat.name)", text: draft, axis: .vertical).textFieldStyle(.plain)
-          .lineLimit(1...6).focused($focus).font(TypeRole.message).padding(
-            .vertical, Layout.Space.small
-          ).padding(.horizontal, 12).frame(minHeight: compact ? Layout.touch : Layout.pointer)
-          .background(Ink.fill, in: RoundedRectangle(cornerRadius: Layout.Radius.composer))
-          .accessibilityIdentifier(
-            "composer"
-          ).onKeyPress(.return, phases: .down) { press in
-            #if os(macOS)
-              if press.modifiers.isEmpty {
-                start()
-                return .handled
+        }.disabled(attachments.reading)
+        Group {
+          #if os(macOS)
+          MacChatEditor(text: draft, label: "Message \(chat.name)", focusRequest: composerFocusRequest,
+            submit: start, canDrop: acceptsFiles, highlight: { fileTargeted = $0 }, attach: stage)
+            .overlay(alignment: .topLeading) {
+              if draftText.isEmpty {
+                Text("Message \(chat.name)").foregroundStyle(.tertiary).allowsHitTesting(false).accessibilityHidden(true)
               }
-            #endif
-            return .ignored
-          }
+            }
+            .frame(minHeight: Layout.pointer)
+          #else
+          TextField("Message \(chat.name)", text: draft, axis: .vertical).textFieldStyle(.plain)
+            .lineLimit(1...6).focused($focus).accessibilityIdentifier("composer")
+            .padding(.vertical, Layout.Space.small).padding(.horizontal, 12)
+            .frame(minHeight: compact ? Layout.touch : Layout.pointer)
+            .background(Ink.fill, in: RoundedRectangle(cornerRadius: Layout.Radius.composer))
+          #endif
+        }.font(TypeRole.message)
         if !canSend, feed.turns.contains(where: \.canStop) {
           Button {
             stopping = true
@@ -317,7 +353,7 @@ struct Conversation: View {
         } else {
           Button(action: start) {
             Group {
-              if sending {
+              if sending || attachments.reading {
                 ProgressView().controlSize(.small)
               } else {
                 Image(systemName: "arrow.up").font(
@@ -327,44 +363,34 @@ struct Conversation: View {
               width: compact ? Layout.touch : Layout.pointer,
               height: compact ? Layout.touch : Layout.pointer
             ).foregroundStyle(canSend ? colors.text : Color.secondary).background(
-              canSend ? colors.fill : Ink.fill, in: Circle())
+              canSend ? colors.fill : disabledSendFill, in: Circle())
           }.buttonStyle(.plain).disabled(!canSend).keyboardShortcut(.return, modifiers: .command)
             .accessibilityLabel("Send").accessibilityIdentifier("send")
         }
       }
-    }.disabled(sending || reading)
+    }
+    #if os(macOS)
+    .padding(10)
+    .background(Ink.fill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    #endif
+    .disabled(sending)
   }
+  #if os(macOS)
+  private var composerControlSpacing: CGFloat { Layout.Space.tight }
+  private var disabledSendFill: Color { Ink.selection }
+  #else
+  private var composerControlSpacing: CGFloat { Layout.Space.small }
+  private var disabledSendFill: Color { Ink.fill }
+  #endif
   var canSend: Bool {
-    !sending && !reading
+    !sending && !attachments.reading
       && (!draft.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        || !files.isEmpty)
+        || !attachments.files.isEmpty)
   }
-  nonisolated static func readFiles(
-    _ urls: [URL], count: Int, bytes: Int, maxCount: Int, maxBytes: Int
-  ) async throws -> [Upload] {
-    guard count + urls.count <= maxCount else {
-      throw Failure("Too many attachments for one message.")
+  @discardableResult private func stage(_ urls: [URL]) -> Bool {
+    attachments.stage(count: urls.count, limits: .init(account: store.account)) { finish in
+      finish(urls.map { .success($0) })
     }
-    var staged = [Upload]()
-    for url in urls {
-      try Task.checkCancellation()
-      let access = url.startAccessingSecurityScopedResource()
-      defer { if access { url.stopAccessingSecurityScopedResource() } }
-      let info = try url.resourceValues(forKeys: [.fileSizeKey, .contentTypeKey, .isRegularFileKey])
-      let limit = min(maxBytes, 24_000_000 - bytes - staged.reduce(0, { $0 + $1.data.count }))
-      guard info.isRegularFile == true, let size = info.fileSize, size > 0, size <= limit else {
-        throw Failure("The file is empty or exceeds the attachment size limit.")
-      }
-      let handle = try FileHandle(forReadingFrom: url)
-      defer { try? handle.close() }
-      guard let data = try handle.read(upToCount: limit + 1), !data.isEmpty, data.count <= limit
-      else { throw Failure("The file exceeds the attachment size limit.") }
-      staged.append(
-        Upload(
-          name: url.lastPathComponent,
-          mime: info.contentType?.preferredMIMEType ?? "application/octet-stream", data: data))
-    }
-    return staged
   }
   func start() {
     guard canSend else { return }
@@ -374,6 +400,7 @@ struct Conversation: View {
       return
     }
     let key = store.draftKey(chat)
+    let files = attachments.files
     let matches =
       pending.map {
         $0.text == text && $0.files.map(\.id) == files.map(\.id) && $0.quote?.id == quote?.id
@@ -436,7 +463,7 @@ struct Conversation: View {
         }
         store.drafts[outgoing.draftKey] = nil
         draftText = ""
-        files = []
+        attachments.clear()
         quote = nil
         excerpt = nil
         pending = nil
@@ -453,6 +480,7 @@ struct Bubble: View {
   let outgoingColors: OutgoingColors
   let reactions: [String: Int]
   let waitingForUser: Bool
+  @Binding var unreadMarker: String?
   let reload: () async throws -> Void, report: (String) -> Void
   let width: CGFloat
   let reply: (String?) -> Void
@@ -460,8 +488,15 @@ struct Bubble: View {
   @State private var picker = false
   @State private var selecting = false
   @State private var reacting = false
+  @State private var copied: UUID?
+  #if os(macOS)
+  @State private var trackingMenu: ObjectIdentifier?
+  #endif
   @State private var pendingReaction: (String, String)?
   @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @FocusState private var focused: ActionFocus?
+  private enum ActionFocus: Hashable { case message, react, reply, more }
   private var stored: Bool {
     !message.id.hasPrefix("progress:") && !message.id.hasPrefix("subagent:")
   }
@@ -486,6 +521,33 @@ struct Bubble: View {
       {
         Text(name).font(.caption.weight(.medium)).foregroundStyle(.secondary)
       }
+      #if os(macOS)
+        if stored {
+          MacChatActionLayout(outgoing: mine, maxContentWidth: width) {
+            content.focusable().focused($focused, equals: .message)
+            macActions
+          }.background { MacChatHoverRegion { hovering = $0 } }
+        } else {
+          content.frame(maxWidth: width, alignment: mine ? .trailing : .leading)
+        }
+      #else
+        content.frame(maxWidth: width, alignment: mine ? .trailing : .leading)
+      #endif
+      if !reactions.isEmpty {
+        ViewThatFits(in: .horizontal) {
+          HStack(spacing: 4) { badges }
+          LazyVGrid(columns: [GridItem(.adaptive(minimum: 52))], alignment: .leading, spacing: 4) {
+            badges
+          }
+        }.frame(maxWidth: width, alignment: mine ? .trailing : .leading)
+      }
+    }.frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
+      .sheet(isPresented: $selecting) {
+        MessageSelection(text: message.selectableText, reply: reply)
+      }
+  }
+  private var content: some View {
+    VStack(alignment: mine ? .trailing : .leading, spacing: 3) {
       ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
         let surface = mine || segment.first?.isNarration == true
         VStack(alignment: .leading, spacing: 6) {
@@ -528,81 +590,72 @@ struct Bubble: View {
           } ? .all : .subviews)
           #endif
           .contextMenu {
-            menuItems
+            menuItems(selection: true)
             if canReact { Menu("React", systemImage: "face.smiling") { emojiButtons } }
           }
       }
-      if !reactions.isEmpty {
-        ViewThatFits(in: .horizontal) {
-          HStack(spacing: 4) { badges }
-          LazyVGrid(columns: [GridItem(.adaptive(minimum: 52))], alignment: .leading, spacing: 4) {
-            badges
+    }
+  }
+  #if os(macOS)
+  private var macActions: some View {
+    let visible = hovering || picker || voiceOver || focused != nil || copied != nil || trackingMenu != nil
+    return ZStack {
+      if visible {
+        HStack(spacing: 2) {
+          if canReact {
+            Button { picker.toggle() } label: { icon("face.smiling") }
+              .focused($focused, equals: .react).accessibilityLabel("React").help("React")
+              .popover(isPresented: $picker) {
+                HStack(spacing: 2) { emojiButtons }.padding(6)
+                  .onExitCommand { picker = false }
+              }
           }
-        }
+          Button { reply(nil) } label: { icon("arrowshape.turn.up.left") }
+            .focused($focused, equals: .reply).accessibilityLabel("Reply").help("Reply")
+          Menu { menuItems(selection: false) } label: {
+            icon(copied == nil ? "ellipsis" : "checkmark")
+          }.menuStyle(.button).menuIndicator(.hidden).focused($focused, equals: .more)
+            .accessibilityLabel(copied == nil ? "More message actions" : "Copied")
+            .help(copied == nil ? "More message actions" : "Copied")
+        }.buttonStyle(MacChatButtonStyle()).transition(.opacity)
+          .onReceive(NotificationCenter.default.publisher(for: NSMenu.didBeginTrackingNotification)) { note in
+            if (hovering || focused == .more), let menu = note.object as? NSMenu { trackingMenu = ObjectIdentifier(menu) }
+          }
+          .onReceive(NotificationCenter.default.publisher(for: NSMenu.didEndTrackingNotification)) { note in
+            if let menu = note.object as? NSMenu, trackingMenu == ObjectIdentifier(menu) { trackingMenu = nil }
+          }
       }
-    }.frame(maxWidth: width, alignment: mine ? .trailing : .leading).contentShape(Rectangle())
-      .overlay(alignment: mine ? .topLeading : .topTrailing) {
-        if stored && showsControls {
-          HStack(spacing: 2) {
-            if canReact {
-              Button {
-                picker.toggle()
-              } label: {
-                icon("face.smiling")
-              }.accessibilityLabel("React").help("React")
-                .popover(isPresented: $picker) {
-                  HStack(spacing: 0) { emojiButtons }.padding(6).presentationCompactAdaptation(
-                    .popover)
-                }
-            }
-            Button {
-              reply(nil)
-            } label: {
-              icon("arrowshape.turn.up.left")
-            }.accessibilityLabel("Reply").help("Reply")
-            Menu {
-              menuItems
-            } label: {
-              icon("ellipsis")
-            }.menuIndicator(.hidden).accessibilityLabel("More message actions")
-          }.buttonStyle(.plain).padding(.horizontal, 3).background(.regularMaterial, in: Capsule())
-        }
-      }
-      .onHover { hovering = $0 }
-      .frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
-      .sheet(isPresented: $selecting) {
-        MessageSelection(text: message.selectableText, reply: reply)
+    }.frame(width: canReact ? 88 : 58, height: 28)
+      .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: visible)
+      .task(id: copied) {
+        guard copied != nil else { return }
+        do { try await Task.sleep(for: .seconds(1.2)); copied = nil } catch {}
       }
   }
-  var showsControls: Bool {
-    #if os(macOS)
-      hovering || picker || voiceOver
-    #else
-      false
-    #endif
+  private func icon(_ name: String) -> some View {
+    Image(systemName: name).font(.system(size: 14, weight: .medium))
+      .frame(width: 28, height: 28).contentShape(Rectangle())
   }
-  func icon(_ name: String) -> some View {
-    #if os(macOS)
-      Image(systemName: name).font(.caption).frame(width: 27, height: 24).contentShape(Rectangle())
-    #else
-      Image(systemName: name).font(.footnote).frame(width: 44, height: 44).contentShape(Rectangle())
-    #endif
-  }
-  @ViewBuilder var menuItems: some View {
+  #endif
+  @ViewBuilder private func menuItems(selection: Bool) -> some View {
     if stored { Button("Reply", systemImage: "arrowshape.turn.up.left") { reply(nil) } }
-    if stored {
+    if stored && message.id != unreadMarker {
       Button("Mark as unread", systemImage: "envelope.badge") {
         Task {
-          do { try await store.mark(chat, unread: true, from: message.id) } catch {
+          do {
+            try await store.mark(chat, unread: true, from: message.id)
+            unreadMarker = message.id
+          } catch {
             report(error.localizedDescription)
           }
         }
       }
     }
     if !message.selectableText.isEmpty {
-      if stored { Button("Select text…", systemImage: "selection.pin.in.out") { selecting = true } }
-      Button("Copy text", systemImage: "doc.on.doc") {
-        PlatformClipboard.copy(message.selectableText)
+      if stored && selection { Button("Select text…", systemImage: "selection.pin.in.out") { selecting = true } }
+      Button(selection ? "Copy text" : "Copy", systemImage: "doc.on.doc") {
+        if PlatformClipboard.copy(message.selectableText) { copied = UUID() }
+        else { report("Couldn’t copy the message. Try again.") }
       }
     }
   }
@@ -611,9 +664,18 @@ struct Bubble: View {
       Button {
         react(emoji)
       } label: {
-        Text(emoji).font(.title2).frame(width: 44, height: 44)
+        #if os(macOS)
+        Text(verbatim: emoji).font(.system(size: 23)).frame(width: 34, height: 34)
+        #else
+        Text(verbatim: emoji).font(.title2).frame(width: 44, height: 44)
+        #endif
       }
-      .buttonStyle(.plain).accessibilityLabel(emoji).disabled(reacting)
+      #if os(macOS)
+      .buttonStyle(MacChatButtonStyle())
+      #else
+      .buttonStyle(.plain)
+      #endif
+      .accessibilityLabel(emoji).disabled(reacting)
     }
   }
   @ViewBuilder var badges: some View {

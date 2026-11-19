@@ -193,8 +193,7 @@ final class MacWorkspaceTests: XCTestCase {
     app.buttons["Cancel"].click()
     app.buttons["Close profile"].click()
     let message = app.staticTexts["I found three trails worth exploring."].firstMatch
-    message.hover()
-    element(app, "More message actions").click()
+    message.rightClick()
     app.menuItems["Select text…"].click()
     let reader = element(app, "passage-reader")
     XCTAssertTrue(reader.waitForExistence(timeout: 5))
@@ -206,6 +205,34 @@ final class MacWorkspaceTests: XCTestCase {
     quote.click()
     XCTAssertTrue(app.buttons["Cancel reply"].waitForExistence(timeout: 5))
     XCTAssertTrue(app.staticTexts["I"].exists)
+  }
+
+  func testActionsStayBesideBothMessages() throws {
+    let app = launch()
+    app.buttons["chat-Chief"].click()
+    let outgoing = app.staticTexts["Yes, please. What should we cover first?"].firstMatch
+    XCTAssertTrue(outgoing.waitForExistence(timeout: 5))
+    outgoing.hover()
+    let more = element(app, "More message actions")
+    XCTAssertTrue(more.waitForExistence(timeout: 2))
+    XCTAssertLessThanOrEqual(more.frame.maxX, outgoing.frame.minX)
+    more.click()
+    XCTAssertTrue(app.menuItems["Reply"].exists)
+    XCTAssertTrue(app.menuItems["Mark as unread"].exists)
+    XCTAssertTrue(app.menuItems["Copy"].exists)
+    app.typeKey(.escape, modifierFlags: [])
+    let incoming = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "I’ve gathered the notes")).firstMatch
+    incoming.hover()
+    let react = app.buttons["React"].firstMatch
+    XCTAssertTrue(react.waitForExistence(timeout: 2))
+    XCTAssertGreaterThanOrEqual(react.frame.minX, incoming.frame.maxX)
+    react.click()
+    app.buttons["🎉"].click()
+    XCTAssertTrue(app.buttons["🎉, 1 reactions"].waitForExistence(timeout: 5))
+    outgoing.hover()
+    app.buttons["Reply"].click()
+    XCTAssertTrue(app.buttons["Cancel reply"].isHittable)
+    XCTAssertTrue(app.staticTexts["You"].exists)
   }
 
   func testCancelRoutineInShortWindow() throws {

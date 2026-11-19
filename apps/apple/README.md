@@ -50,6 +50,8 @@ On Mac, drag the floating panel’s outside edge to resize it or double-click to
 
 `App/Design.swift` defines the layout and semantic colors. Your bubbles and the enabled Send button take the selected bot’s color with white text in both appearances, following [Rakazo’s shared color rule](../../packages/core/src/avatars/bot-avatar-colors.ts). Groups, photo avatars and white bots use the neutral theme colors. Increase Contrast deepens bright accents further. Bot replies and sidebar selections stay neutral. iOS uses Dynamic Type; sidebar motion respects Reduce Motion and VoiceOver can adjust its width.
 
+On Mac, hover over or keyboard-focus a sent or received bubble to reveal its actions beside the text. React opens a popover; More opens the system menu. Right-click for **Select text…** to quote a passage. Drag Finder files anywhere in the open chat, or use the paperclip. Releasing stages files beside the draft; only **Send** posts them. A failed file is identified inline without discarding the other attachments.
+
 ## Where to make changes
 
 `App/Connection.swift`, `App/Models.swift`, `App/WorkspaceStore.swift` and `App/Timeline.swift` share authentication, API models, workspace state, chat history and streaming without importing a UI framework. Chat rendering, command results, bot profiles, connections and routines also have one implementation. `App/Shell.swift` routes the shared workspace; `App/Platform/` owns the two navigation layouts and the few controls that need AppKit or UIKit, including keyboard handling in the command menu and native text selection for quotes. Add a new message type or server operation once; split the view only when the interaction differs by platform.
@@ -59,6 +61,8 @@ On Mac, drag the floating panel’s outside edge to resize it or double-click to
 The compatibility target is [Rakazo v0.12.0](https://github.com/elie222/rakazo/tree/v0.12.0), commit `8b3dcd596dedc63021d98373107ab06665b0ad41`. Choose an available simulator with `xcrun simctl list devices available`.
 
 **Do not run the macOS UI test scheme in an active desktop session:** XCTest sends input to the logged-in desktop. Use a dedicated disposable macOS login/VM for Mac UI actions. The Mac build, model test below and iOS simulator tests do not need to drive Mac apps.
+
+`bash Tools/test-chat-interactions.sh` checks hover controls on both sides of a conversation, replies, dropping files into the focused composer and sending a multiline message. It uses an offscreen Mac window, a private drag pasteboard, temporary files and an in-memory sample workspace. It does not need Accessibility permission or an account.
 
 ```sh
 # A throwaway upstream release API, Postgres, and scripted worker; no production keys.
