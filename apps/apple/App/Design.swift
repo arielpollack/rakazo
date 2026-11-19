@@ -8,9 +8,10 @@ enum Layout {
   }
   enum Radius {
     static let control: CGFloat = 10, row: CGFloat = 14, panel: CGFloat = 16
-    static let bubble: CGFloat = 15, composer: CGFloat = 14
+    static let bubble: CGFloat = 20, composer: CGFloat = 14
   }
   static let touch: CGFloat = 44, pointer: CGFloat = 32
+  static let bubbleInsetX: CGFloat = 14, bubbleInsetY: CGFloat = 9
   static let sidebar: CGFloat = 304, sidebarMin: CGFloat = 238, sidebarMax: CGFloat = 420
   static let inspector: CGFloat = 328, readingWidth: CGFloat = 584
   static let profileSheetMaxHeight: CGFloat = 680
@@ -53,7 +54,8 @@ extension Chat {
 
 extension Color {
   init(rgb hex: UInt32) {
-    self.init(.sRGB,
+    self.init(
+      .sRGB,
       red: Double(hex >> 16 & 255) / 255, green: Double(hex >> 8 & 255) / 255,
       blue: Double(hex & 255) / 255)
   }
@@ -85,35 +87,29 @@ struct FloatingPanel: ViewModifier {
 struct Avatar: View {
   let chat: Chat
   var size: CGFloat = 36
-  @Environment(\.colorScheme) private var scheme
+  var pose: BotPose = .idle
+  var composing = false
+  var activityMark = false
   var body: some View {
     Group {
       if chat.isGroup {
         Image(systemName: "person.2.fill").resizable().scaledToFit().padding(size * 0.19)
           .foregroundStyle(.secondary).background(
             Ink.selection, in: RoundedRectangle(cornerRadius: size / 3))
-      } else if let value = chat.color, value.hasPrefix("data:image/"),
-        let encoded = value.split(separator: ",", maxSplits: 1).last,
-        let data = Data(base64Encoded: String(encoded)), let photo = Image(platformData: data)
-      {
-        photo.resizable().scaledToFill().clipShape(
-          RoundedRectangle(cornerRadius: size / 3))
-      } else {
-        let index = chat.color?.components(separatedBy: "::shape_").dropFirst().first.flatMap(
-          Int.init)
-        let classic = index != nil || chat.avatarSet == "rakazo"
-        ZStack {
-          Image(classic ? "Classic\(abs((index ?? chat.seed) % 8))" : "Organic\(chat.seed % 10)")
-            .resizable().renderingMode(.template).foregroundStyle(chat.tint).shadow(
-              color: .black.opacity(0.16), radius: size / 55, y: size / 40)
-          HStack(spacing: size * 0.115) {
-            ForEach(0..<2) { _ in Capsule().frame(width: size * 0.059, height: size * 0.199) }
-          }.foregroundStyle(chat.hex == 0xffffff || scheme == .dark ? Color.black : Color.white)
-            .rotationEffect(.degrees(Double(chat.seed % 9) - 4)).offset(
-              y: classic ? -size * 0.025 : 0)
+      } else if !activityMark, let value = chat.color, value.hasPrefix("data:image/") {
+        if let encoded = value.split(separator: ",", maxSplits: 1).last,
+          let data = Data(base64Encoded: String(encoded)), let photo = Image(platformData: data)
+        {
+          photo.resizable().scaledToFill().frame(width: size, height: size).clipShape(Circle())
+        } else {
+          Circle().fill(Ink.fill)
         }
+      } else {
+        BotCharacter(
+          chat: chat, size: size, pose: pose, composing: composing,
+          interactive: activityMark && chat.color?.hasPrefix("data:image/") != true)
       }
-    }.frame(width: size, height: size).accessibilityHidden(true)
+    }.frame(width: size, height: size).accessibilityHidden(!activityMark)
   }
 }
 struct Glyph: View {

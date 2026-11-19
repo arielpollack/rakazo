@@ -7,7 +7,7 @@ A SwiftUI client for an existing Rakazo server. One multiplatform target builds 
 - From the repository root, `open apps/apple/RakazoNative.xcodeproj`. Run the commands below from `apps/apple`; no JavaScript dependencies are needed to build the native client.
 - **Mac:** open **Rakazo Mac** from your user Applications folder. For development, use the `RakazoMac` scheme with **My Mac**, or run `./Tools/run-mac.sh` to build and open a Release copy from the checkout. Requires macOS 14 or later. The local build is ad-hoc signed, not a notarized distribution.
 - **iPhone or iPad:** open `RakazoNative.xcodeproj`, select the `RakazoNative` scheme and a simulator, then Run. For a physical device, select your own signing team in Xcode. The deployment target is iOS 17 or newer. The generated project is included; XcodeGen is only needed after changing `project.yml`.
-- **Without a server:** choose **Explore a sample workspace → Agent walkthrough** to expand a completed action, read computer and helper updates, answer a question, and react to a message. Or press **⌘K**, type **Chief**, press Return, and send a message. The sample is local, not model output. Choose **Account → Connect a server** to leave it.
+- **Without a server:** choose **Explore a sample workspace → Agent walkthrough** to read computer and helper updates, answer a question, and react to a message. Or press **⌘K**, type **Chief**, press Return, and send a message. The sample is local, not model output. Choose **Account → Connect a server** to leave it.
 - **With a server:** enter the origin of your Rakazo deployment and use the sign-in method it supports. Use HTTPS outside loopback. The native app stores the session in the device-only Keychain, not the password. The ad-hoc Mac build has no provisioned Keychain access group: choose **Continue for this session** to sign in until quit. No token is written to preferences and the browser does not receive it.
 
 ### Try the sample integrations and computers
@@ -30,7 +30,7 @@ The catalog is shipped in the app; the sample never contacts a provider, install
 | Surface | What you can do |
 | --- | --- |
 | Workspace | Switch spaces, create bots, groups and private spaces; search chats and message history, read a match in context, and jump back to the live conversation; pin or mark a conversation unread. |
-| Conversation | Send, react, reply to a message or quote a selected passage, mark unread from a message, stream worker updates, expand actions, answer plain agent questions, stop a run, and transfer attachments. AI-recipient disclosures appear before sending when required. |
+| Conversation | Send, react, reply or quote a passage, mark unread, watch the active bot work and write, answer a question, stop a run, and transfer attachments. Tool progress is transient; actionable cards remain. AI-recipient disclosures appear before sending when required. |
 | Inspector | Edit bot profiles and group membership, inspect computer status, and list pages and routines. Create a paused daily routine, edit its prompt, activate or pause it, read run history, or delete it. |
 | Activity and settings | Open the chat behind a run. Review a connector, authorize in the provider’s browser, check its status, inspect tools, rename or revoke an account. Change appearance and sign out. |
 
@@ -39,6 +39,8 @@ This is **not full Rakazo feature parity**. [The parity ledger](PARITY.md) separ
 ## Interface
 
 Rakazo Desktop 0.12.0 is the reference for the product and its visual identity. REA’s bound-window inspection and native computer use were used to compare the running app, not to recover implementation code. Telegram for Mac was a reference **only for interaction**: an inset, floating conversation list and a chat that stays put while you browse or search. In light mode, one white canvas extends from the title bar through the chat and behind the floating sidebar. Dark mode uses the same layout with the system background.
+
+Bot artwork comes from the original mobile avatar components and motion data. The checked-in `AvatarEngine` asset projects them into native Canvas layers without a WebView, a substitute mascot or an extra mask. To regenerate it, run `node Tools/Avatars/compile.mjs /path/to/rakazo` against the reference source with its JS dependencies installed.
 
 **⌘K opens a modal command menu over the workspace**, including from the composer. Type to find conversations, pages (connected servers), or actions. Use ↑/↓ and Return to choose, or Escape to dismiss without changing the draft. The visible sidebar search is separate and still searches message history. Without a keyboard, use **Command menu** in the workspace menu.
 
@@ -73,6 +75,18 @@ xcodebuild -scheme RakazoNative -destination 'platform=iOS Simulator,name=iPad P
 mkdir -p .build
 swiftc App/Models.swift App/Connection.swift Tools/ServerSmoke.swift -o .build/server-smoke
 ./Tools/with-upstream.sh .build/server-smoke
+
+# Render the packaged avatar families and exercise all eight poses. --server also checks
+# a live turn and reads back the settled Mac chat pixels against a disposable worker.
+bash Tools/test-chat-activity.sh --server
+
+# Switch between short and multi-screen histories and verify the newest bubble is painted.
+# Also check mixed message formats and chat switching on a disposable release server.
+# The fixture puts 510 background deliveries after a bot's saved conversation; no desktop input.
+files=(App/*.swift App/Platform/*.swift)
+swiftc -whole-module-optimization ${files:#App/RakazoApp.swift} Tools/ChatHistorySmoke.swift -o .build/chat-history-smoke
+.build/chat-history-smoke
+./Tools/with-upstream.sh --chat-history .build/chat-history-smoke --release-server
 
 # Offline tests: no account, provider, Docker, device input or mounted environment file.
 core=(App/{Models,Connection,Sample,SampleComputer,IntegrationLibrary,WorkspaceStore,PrivateSpace,MarketplaceCatalog,ManagedIntegrations,ManagedServers}.swift)
