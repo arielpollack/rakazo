@@ -272,6 +272,7 @@ import Foundation
       message.replyToMessageId = reply.id
       message.replyQuote = excerpt
     }
+    AskInputCard.answerSampleQuestion(&items, with: message)
     items.append(message)
     items.append(
       Sample.message(

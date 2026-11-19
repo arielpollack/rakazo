@@ -79,16 +79,24 @@ struct Conversation: View {
                     ).foregroundStyle(.secondary)
                   }.padding(.top, 65)
                 }
-                ForEach(Array(feed.rows.visible.enumerated()), id: \.element.id) { index, message in
+                let messages = feed.rows.visible
+                let separators = Set(
+                  messages.indices.filter {
+                    Clock.needsSeparator(
+                      messages[$0].createdAt, after: $0 == 0 ? nil : messages[$0 - 1].createdAt)
+                  }.map { messages[$0].id })
+                let pages = PageCard.newest(messages)
+                ForEach(VoiceChatCard.groups(messages) { $0.callId }) { row in
                   VStack(spacing: 9) {
-                    if Clock.needsSeparator(
-                      message.createdAt,
-                      after: index == 0 ? nil : feed.rows.visible[index - 1].createdAt)
-                    {
-                      Text(Clock.label(message.createdAt, full: true)).font(
+                    if let first = row.first, separators.contains(first.id) {
+                      Text(Clock.label(first.createdAt, full: true)).font(
                         .caption.weight(.medium)
                       ).foregroundStyle(.secondary).padding(.vertical, Layout.Space.small)
                     }
+                    switch row {
+                    case .voiceChat(let group):
+                      VoiceChatCard(group: group).frame(maxWidth: .infinity, alignment: .leading)
+                    case .message(let message):
                     Bubble(
                       message: message, chat: chat, store: store, outgoingColors: colors,
                       reactions: feed.rows.reactions[message.id] ?? [:],
@@ -108,7 +116,8 @@ struct Conversation: View {
                         #else
                         focus = true
                         #endif
-                      })
+                      }, peerExchange: feed.rows.exchanges[message.id], newestPages: pages)
+                    }
                   }
                 }
                 OutboxRows(
@@ -439,6 +448,10 @@ struct Bubble: View {
   let reload: () async throws -> Void, report: (String) -> Void
   let width: CGFloat
   let reply: (String?) -> Void
+  /// The line this message opens when it is one of several with another bot.
+  var peerExchange: PeerTranscript.Exchange? = nil
+  /// The newest version of each page the chat shows, by page id.
+  var newestPages: [String: String] = [:]
   @State private var hovering = false
   @State private var picker = false
   @State private var selecting = false
@@ -452,23 +465,21 @@ struct Bubble: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @FocusState private var focused: ActionFocus?
   private enum ActionFocus: Hashable { case message, react, reply, more }
-  private var stored: Bool {
+  var stored: Bool {
     !message.id.hasPrefix("progress:") && !message.id.hasPrefix("subagent:")
   }
-  private var canReact: Bool { stored && !message.blocks.contains { $0.kind == "channel_message" } }
-  private var segments: [[Message.Block]] {
-    message.blocks.filter(\.visible).reduce(into: []) { groups, block in
-      if block.isNarration, groups.last?.last?.isNarration == true {
-        groups[groups.count - 1].append(block)
-      } else {
-        groups.append([block])
-      }
-    }
-  }
+  var canReact: Bool { stored && !message.blocks.contains { $0.kind == "channel_message" } }
   var mine: Bool {
     message.role == "user" && (message.author == nil || message.author?.id == store.account?.userId)
   }
   var body: some View {
+    if centered {
+      centeredLine
+    } else {
+      messageBody
+    }
+  }
+  var messageBody: some View {
     VStack(alignment: mine ? .trailing : .leading, spacing: 3) {
       if !mine, chat.isGroup,
         let name = store.navigation?.current.bots.first(where: { $0.id == message.botId })?.name
@@ -503,55 +514,8 @@ struct Bubble: View {
   }
   private var content: some View {
     VStack(alignment: mine ? .trailing : .leading, spacing: 3) {
-      ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
-        let surface = mine || segment.first?.isNarration == true
-        VStack(alignment: .leading, spacing: 6) {
-          if index == 0, let quoted = message.replyQuote ?? message.replyPreview?.text {
-            Text(verbatim: quoted).lineLimit(2).font(.caption).padding(7).background(
-              .black.opacity(0.08), in: RoundedRectangle(cornerRadius: 7))
-          }
-          ForEach(Array(segment.enumerated()), id: \.offset) { _, block in
-            if block.isNarration {
-              MessageText(content: block.label).equatable()
-            } else if ["file", "image"].contains(block.kind) {
-              AttachmentBlock(block: block, chat: chat, api: store.client)
-            } else if block.kind == "card", let pairs = block.lines {
-              VStack(alignment: .leading, spacing: Layout.Space.small) {
-                ForEach(Array(pairs.enumerated()), id: \.offset) { _, pair in
-                  VStack(alignment: .leading, spacing: Layout.Space.tight) {
-                    Text(pair.k).font(.caption.weight(.semibold))
-                    Text(pair.v).textSelection(.enabled)
-                  }.accessibilityElement(children: .combine)
-                }
-              }
-            } else if block.kind == "ask", block.actions?.isEmpty == false {
-              AskCard(
-                block: block, message: message, chat: chat, store: store, refresh: reload,
-                report: report)
-            } else {
-              AgentBlock(
-                block: block, message: message, chat: chat, store: store, refresh: reload,
-                report: report)
-            }
-          }
-        }.font(TypeRole.message).padding(.horizontal, surface ? Layout.bubbleInsetX : 0).padding(
-          .vertical, surface ? Layout.bubbleInsetY : 0
-        ).foregroundStyle(mine ? outgoingColors.text : Color.primary)
-          .tint(mine ? outgoingColors.text : nil).background(
-            mine ? outgoingColors.fill : surface ? Ink.fill : .clear,
-            in: RoundedRectangle(cornerRadius: Layout.Radius.bubble, style: .continuous)
-          )
-          #if os(iOS)
-          .simultaneousGesture(TapGesture(count: 2).onEnded {
-            if reactions["👍"] == nil { react("👍") }
-          }, including: canReact && !waitingForUser && message.blocks.allSatisfy {
-            ["text", "image", "file", "chart", "page"].contains($0.kind)
-          } ? .all : .subviews)
-          #endif
-          .contextMenu {
-            menuItems(selection: true)
-            if canReact { Menu("React", systemImage: "face.smiling") { emojiButtons } }
-          }
+      ForEach(Array(pieces.enumerated()), id: \.offset) { index, blocks in
+        piece(blocks, first: index == 0)
       }
     }
   }
@@ -596,7 +560,7 @@ struct Bubble: View {
       .frame(width: 28, height: 28).contentShape(Rectangle())
   }
   #endif
-  @ViewBuilder private func menuItems(selection: Bool) -> some View {
+  @ViewBuilder func menuItems(selection: Bool) -> some View {
     if stored { Button("Reply", systemImage: "arrowshape.turn.up.left") { reply(nil) } }
     if stored && message.id != unreadMarker {
       Button("Mark as unread", systemImage: "envelope.badge") {
