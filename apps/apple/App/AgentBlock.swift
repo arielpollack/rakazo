@@ -31,7 +31,7 @@ struct AgentBlock: View {
     }.padding(12).background(Ink.canvas, in: RoundedRectangle(cornerRadius: Layout.Radius.control))
       .overlay { RoundedRectangle(cornerRadius: Layout.Radius.control).strokeBorder(Ink.line) }
       .tint(Ink.action)
-      .sheet(
+      .rakazoSheet(
         isPresented: $reviewingHost,
         onDismiss: {
           Task { do { try await refresh() } catch { report(error.localizedDescription) } }

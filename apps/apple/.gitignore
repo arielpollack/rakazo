@@ -3,5 +3,8 @@
 DerivedData/
 xcuserdata/
 *.xcresult
-!/Design/
+/Design/
+/Mockups/
+/Plans/
+/Screenshots/
 *.pen

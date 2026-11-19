@@ -57,7 +57,7 @@
         }
       }.background(MarketStyle.canvas)
         .task(id: generation) { await refresh() }
-        .sheet(
+        .rakazoSheet(
           item: $setup,
           onDismiss: {
             flow.close()

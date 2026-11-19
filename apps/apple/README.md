@@ -8,7 +8,7 @@ A SwiftUI client for an existing Rakazo server. One multiplatform target builds 
 - **Mac:** open **Rakazo Mac** from your user Applications folder. For development, use the `RakazoMac` scheme with **My Mac**, or run `./Tools/run-mac.sh` to build and open a Release copy from the checkout. Requires macOS 14 or later. The local build is ad-hoc signed, not a notarized distribution.
 - **iPhone or iPad:** open `RakazoNative.xcodeproj`, select the `RakazoNative` scheme and a simulator, then Run. For a physical device, select your own signing team in Xcode. The deployment target is iOS 17 or newer. The generated project is included; XcodeGen is only needed after changing `project.yml`.
 - **Without a server:** choose **Explore a sample workspace → Agent walkthrough** to read computer and helper updates, answer a question, and react to a message. Or press **⌘K**, type **Chief**, press Return, and send a message. The sample is local, not model output. Choose **Account → Connect a server** to leave it.
-- **With a server:** enter the origin of your Rakazo deployment and use the sign-in method it supports. Use HTTPS outside loopback. The native app stores the session in the device-only Keychain, not the password. The ad-hoc Mac build has no provisioned Keychain access group: choose **Continue for this session** to sign in until quit. No token is written to preferences and the browser does not receive it.
+- **With a server:** enter the origin of your Rakazo deployment and use the sign-in method it supports. Use HTTPS outside loopback. The app remembers the session token, never the password. The ad-hoc Mac preview uses your macOS login Keychain; iOS and provisioned Mac builds use the data-protection Keychain. Reopening the app restores the session. Signing out removes it. After an ad-hoc build changes, macOS may ask you to allow the updated app to read its Keychain item. If Keychain is unavailable, you can explicitly continue only until quit. No token is written to preferences.
 
 ### Try the sample integrations and computers
 
@@ -23,7 +23,7 @@ A SwiftUI client for an existing Rakazo server. One multiplatform target builds 
 | **Computer walkthrough → Review bot screen…** | Opening the screen only watches. **Take control**, change the checklist title or mark it reviewed, then **I’m done**. The bot reports what you changed. Closing without finishing releases control but leaves the request pending. **Profile → Computer → View bot screen** lets you request another review. |
 | **Computer walkthrough → Review computer access…** | This is the opposite direction: the bot asks to read a note on a **simulated Mac**. Decline, or enable both simulated permissions and authorize the read. On Mac, **Profile → Computer → Computer access…** also lets you revoke it. The desktop note is separate from the bot’s checklist. |
 
-The catalog is shipped in the app; the sample never contacts a provider, installs an MCP package, or reads a local file, screen or account. Existing sample workspaces gain the walkthroughs without a reset. The [parity ledger](PARITY.md) documents the public data sources and live limitations.
+The catalog ships with the app. The sample walkthroughs do not contact a provider, install an MCP package, or read your screen or accounts. Existing sample workspaces gain the walkthroughs without a reset.
 
 ## Native workflows
 
@@ -34,11 +34,11 @@ The catalog is shipped in the app; the sample never contacts a provider, install
 | Inspector | Edit bot profiles and group membership, inspect computer status, and list pages and routines. Create a paused daily routine, edit its prompt, activate or pause it, read run history, or delete it. |
 | Activity and settings | Open the chat behind a run. Review a connector, authorize in the provider’s browser, check its status, inspect tools, rename or revoke an account. Change appearance and sign out. |
 
-This is **not full Rakazo feature parity**. [The parity ledger](PARITY.md) separates native interactions, web handoffs, unimplemented surfaces and verification. Web handoffs require the deployment’s web UI and a separate browser session; they do not embed React or a WebView. The sample does not perform real integrations or retain uploaded file bytes. Attachment reads are capped at 24 MB and also respect server upload limits.
+The native client does not yet cover every Rakazo workflow. Web handoffs require the deployment’s web UI and a separate browser session. The sample does not perform real integrations or retain uploaded file bytes. Attachment reads are capped at 24 MB and also respect server upload limits.
 
 ## Interface
 
-Rakazo Desktop 0.12.0 is the reference for the product and its visual identity. REA’s bound-window inspection and native computer use were used to compare the running app, not to recover implementation code. Telegram for Mac was a reference **only for interaction**: an inset, floating conversation list and a chat that stays put while you browse or search. In light mode, one white canvas extends from the title bar through the chat and behind the floating sidebar. Dark mode uses the same layout with the system background.
+The Mac conversation list floats over a single canvas; the chat stays in place while you browse or search. The canvas is white in light mode and uses the system background in dark mode.
 
 Bot artwork comes from the original mobile avatar components and motion data. The checked-in `AvatarEngine` asset projects them into native Canvas layers without a WebView, a substitute mascot or an extra mask. To regenerate it, run `node Tools/Avatars/compile.mjs /path/to/rakazo` against the reference source with its JS dependencies installed.
 
@@ -92,6 +92,9 @@ swiftc -whole-module-optimization ${files:#App/RakazoApp.swift} Tools/ChatHistor
 .build/chat-history-smoke
 ./Tools/with-upstream.sh --chat-history .build/chat-history-smoke --release-server
 
+# Three separate sandboxed Mac processes: sign in, restore against the API and sign out, then check removal.
+./Tools/with-upstream.sh bash Tools/test-mac-session.sh
+
 # Offline tests: no account, provider, Docker, device input or mounted environment file.
 core=(App/{Models,Connection,Sample,SampleComputer,IntegrationLibrary,WorkspaceStore,PrivateSpace,MarketplaceCatalog,ManagedIntegrations,ManagedServers}.swift)
 swiftc "${core[@]}" \
@@ -106,7 +109,7 @@ swiftc "${core[@]}" \
 
 # Native Mac layout and quick-connect state checks; zsh, no visible windows or desktop input.
 out=.build/marketplace/native; mkdir -p "$out"; cp App/sample-catalog.json "$out/"
-ditto Design/Marketplace-assets/Brandmarks "$out/Brandmarks"
+ditto Resources/Brandmarks "$out/Brandmarks"
 files=(App/*.swift App/Platform/*.swift)
 swiftc -whole-module-optimization ${files:#App/RakazoApp.swift} Tools/MarketRenderSmoke.swift -o "$out/market-render"
 "$out/market-render" "$out"

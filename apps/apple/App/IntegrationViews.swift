@@ -130,7 +130,7 @@ struct ToolServersView: View {
           sources = try CatalogSeed.bundled.get().sources
         }
       } catch { if !Task.isCancelled { problem = error.localizedDescription } }
-    }.sheet(item: $selected, onDismiss: { version += 1 }) { server in
+    }.rakazoSheet(item: $selected, onDismiss: { version += 1 }) { server in
       ServerAccessView(store: store, server: server).integrationSheet()
     }
   }

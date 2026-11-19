@@ -74,15 +74,15 @@ struct Profile: View {
       }
     }.background(Ink.canvas).modifier(ProfileSheetSizing(limit: sheetHeightLimit))
       .onAppear { if chat.isGroup { tab = "Members" } }.task(id: "\(tab)-\(reload)") { await load() }
-      .sheet(isPresented: $form) {
+      .rakazoSheet(isPresented: $form) {
         RoutineForm(store: store, chat: chat) {
           form = false
           reload += 1
         }
-      }.sheet(isPresented: $editing) { ProfileEditor(store: store, chat: chat) }
-      .sheet(isPresented: $screenOpen) { SampleScreen(store: store, chat: chat, requestedRun: nil) }
-      .sheet(isPresented: $hostOpen) { SampleHostReview(store: store, bot: chat.id) }
-      .sheet(item: $selectedRoutine, onDismiss: { reload += 1 }) { routine in
+      }.rakazoSheet(isPresented: $editing) { ProfileEditor(store: store, chat: chat) }
+      .rakazoSheet(isPresented: $screenOpen) { SampleScreen(store: store, chat: chat, requestedRun: nil) }
+      .rakazoSheet(isPresented: $hostOpen) { SampleHostReview(store: store, bot: chat.id) }
+      .rakazoSheet(item: $selectedRoutine, onDismiss: { reload += 1 }) { routine in
         RoutineDetails(store: store, chat: chat, routine: routine)
       }
       .deleteBotConfirmation(store: store, target: $deleting, deleted: close)
@@ -348,7 +348,7 @@ struct RoutineForm: View {
       #else
         mobileSheet
       #endif
-    }.interactiveDismissDisabled(busy).sheet(item: $consent) { status in
+    }.interactiveDismissDisabled(busy).rakazoSheet(item: $consent) { status in
       ConsentView(
         status: status, cancel: { consent = nil },
         allow: {
@@ -573,8 +573,8 @@ private struct RoutineDetails: View {
           "Delete \(routine.name)?", isPresented: $confirmDelete, titleVisibility: .visible
         ) {
           Button("Delete routine", role: .destructive) { save(delete: true) }
-        }
-        .sheet(item: $activationConsent) { status in
+        }.allowsQuitFromDialog()
+        .rakazoSheet(item: $activationConsent) { status in
           ConsentView(
             status: status, cancel: { activationConsent = nil },
             allow: {

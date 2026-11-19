@@ -12,7 +12,7 @@ targets:
     supportedDestinations: [iOS, macOS]
     sources:
       - App
-      - path: Design/Marketplace-assets/Brandmarks
+      - path: Resources/Brandmarks
         type: folder
         buildPhase: resources
     settings:

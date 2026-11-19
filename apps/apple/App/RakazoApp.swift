@@ -133,7 +133,7 @@ struct SignIn: View {
       Text(
         "Sign-in succeeded, but Keychain is unavailable. You can use Rakazo now and sign in again after quitting. Your password and session will not be written to disk."
       )
-    }
+    }.allowsQuitFromDialog()
   }
   func field<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
     VStack(alignment: .leading, spacing: 6) {

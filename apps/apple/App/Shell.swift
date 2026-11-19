@@ -72,7 +72,7 @@ struct Shell: View {
           search = false
           phoneChat = store.chat != nil
         }
-      }.onChange(of: inlineInspector) { _, wide in if !wide { inspector = false } }.sheet(
+      }.onChange(of: inlineInspector) { _, wide in if !wide { inspector = false } }.rakazoSheet(
         item: $modal,
         onDismiss: {
           if openChatAfterDismissal {
@@ -213,7 +213,7 @@ struct Shell: View {
         Button("OK") { store.error = nil }
       } message: {
         Text(store.error ?? "")
-      }
+      }.allowsQuitFromDialog()
   }
   @ViewBuilder private var inlineProfile: some View {
     if let chat = store.chat { Profile(store: store, chat: chat, close: { inspector = false }).id(chat.id) }

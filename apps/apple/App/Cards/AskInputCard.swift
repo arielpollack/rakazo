@@ -135,7 +135,7 @@ struct AskInputCard: View {
       }
       if let error { Text(error).font(CardType.caption).foregroundStyle(.red) }
     }.padding(.horizontal, 14).padding(.vertical, 12).chatCard(padded: false)
-      .sheet(
+      .rakazoSheet(
         isPresented: Binding(
           get: { sheetOpen && type == "login" }, set: { if !$0 { sheetOpen = false } })
       ) {
@@ -158,7 +158,7 @@ struct AskInputCard: View {
           sheetOpen = false
         }
       }
-      .sheet(
+      .rakazoSheet(
         isPresented: Binding(
           get: { sheetOpen && type != "login" && !answered },
           set: { if !$0 { sheetOpen = false } })

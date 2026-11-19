@@ -26,6 +26,7 @@ import Vision
     try await checkPrivateSpace(store: store, output: output)
     func directory() -> MarketDirectory { .sample(store.sampleIntegrations!, seed: seed) }
     let initial = directory()
+    try await checkCompactSkills(directory: initial, output: output)
     try await checkManagement(store: store, directory: initial, output: output)
     precondition(
       initial.items.prefix(6).map(\.name) == [
@@ -110,6 +111,42 @@ import Vision
       )
       .frame(width: 268, height: 151)
     }
+  }
+
+  @MainActor private static func checkCompactSkills(directory: MarketDirectory, output: URL) async throws {
+    var sample = Sample.initial
+    let fixture = (1...30).map { "Step \($0). Review the proposed change." }.joined(separator: "\n\n") + "\n\nReview complete."
+    let document = try CommandLine.arguments.dropFirst(2).first.map { try String(contentsOfFile: $0, encoding: .utf8) } ?? fixture
+    let words = document.split(whereSeparator: \.isWhitespace)
+    let opening = words.prefix(4).joined(separator: " "), ending = words.suffix(2).joined(separator: " ")
+    let skill = ManagedSkill(id: "long-read", name: "Interrogate", description: "Review a change.", source: "builtin", readOnly: true, content: document)
+    sample.integrationRecords?.skills = [skill]
+    let store = WorkspaceStore(sample: sample, persistent: false)
+    for (name, route, expected) in [
+      ("library", ManageRoute.skills, ["My integrations", "Search skills", "New skill", "Done"]),
+      ("reader", ManageRoute.skill(skill), ["Skills", "Interrogate", opening, "Done"]),
+    ] {
+      try await render(MacManagement(route, store: store, directory: directory),
+        to: output.appendingPathComponent("compact-skills-\(name).png"), scheme: .dark,
+        width: 680, height: 308, contains: expected)
+    }
+    try await render(MacManagement(.skill(skill), store: store, directory: directory),
+      to: output.appendingPathComponent("compact-skills-reader-end.png"), scheme: .dark,
+      width: 680, height: 308, contains: ["Interrogate", ending, "Done"], omits: [opening]
+    ) { view in
+      @MainActor func scrollView(in root: NSView) -> NSScrollView? {
+        if let scroll = root as? NSScrollView, let document = scroll.documentView,
+          document.bounds.height > scroll.contentView.bounds.height { return scroll }
+        return root.subviews.lazy.compactMap { scrollView(in: $0) }.first
+      }
+      guard let scroll = scrollView(in: view), let document = scroll.documentView else {
+        throw Failure("No scrolling skill document in the short panel.")
+      }
+      let bottom = document.isFlipped ? document.bounds.maxY - scroll.contentView.bounds.height : document.bounds.minY
+      scroll.contentView.scroll(to: NSPoint(x: 0, y: bottom))
+      scroll.reflectScrolledClipView(scroll.contentView)
+    }
+    print("PASS: short Skills library and reader keep navigation and actions visible; scrolled to the final paragraph.")
   }
 
   @MainActor private static func checkManagement(store: WorkspaceStore, directory: MarketDirectory, output: URL) async throws {
@@ -274,7 +311,8 @@ import Vision
 
   @discardableResult @MainActor static func render<Content: View>(
     _ content: Content, to url: URL, scheme: ColorScheme = .light,
-    width: Int = 1040, height: Int? = 702, contains: [String], omits: [String] = []
+    width: Int = 1040, height: Int? = 702, contains: [String], omits: [String] = [],
+    beforeCapture: (@MainActor (NSView) throws -> Void)? = nil
   ) async throws -> Int {
     let fitted = height ?? Int(ceil(NSHostingView(rootView: content).fittingSize.height))
     let size = CGSize(width: width, height: fitted)
@@ -289,6 +327,11 @@ import Vision
     view.layoutSubtreeIfNeeded()
     try await Task.sleep(for: .milliseconds(400))
     view.layoutSubtreeIfNeeded()
+    if let beforeCapture {
+      try beforeCapture(view)
+      try await Task.sleep(for: .milliseconds(120))
+      view.layoutSubtreeIfNeeded()
+    }
     guard !window.isVisible, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
       throw Failure("Expected an offscreen view.")
     }

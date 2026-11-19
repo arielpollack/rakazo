@@ -72,7 +72,7 @@ struct AppConnectCard: View {
         returning = nil
         busy = false
       }
-      .sheet(
+      .rakazoSheet(
         isPresented: $reviewing,
         onDismiss: {
           Task { do { try await refresh() } catch { report(error.localizedDescription) } }

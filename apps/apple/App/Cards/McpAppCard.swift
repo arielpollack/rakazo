@@ -85,6 +85,7 @@ struct McpAppCard: View {
         // Keep the actual host visible even when userinfo or the path is very long.
         Text(verbatim: "\(Self.host(url))\n\n\(url.absoluteString)")
       }
+      .allowsQuitFromDialog()
     }
   }
 

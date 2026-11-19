@@ -45,6 +45,16 @@ final class MacWorkspaceTests: XCTestCase {
     XCTAssertTrue(app.buttons["Studio QA, switch workspace"].waitForExistence(timeout: 5))
   }
 
+  func testCommandQQuitsWithFocusedModal() {
+    let app = launch()
+    app.typeKey("k", modifierFlags: .command)
+    let search = app.textFields["command-query"]
+    XCTAssertTrue(search.waitForExistence(timeout: 5))
+    search.typeText("Scout")
+    app.typeKey("q", modifierFlags: .command)
+    XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
+  }
+
   func testPaletteAndSidebarPreserveConversationDraft() throws {
     let app = launch()
     let chief = app.buttons["chat-Chief"].firstMatch
@@ -410,8 +420,7 @@ final class MacWorkspaceTests: XCTestCase {
     credential.click()
     credential.typeText(password)
     app.buttons["signin"].click()
-    let temporary = app.buttons["Continue for this session"]
-    if temporary.waitForExistence(timeout: 4) { temporary.click() }
+    XCTAssertTrue(element(app, "create").waitForExistence(timeout: 10))
     app.typeKey("n", modifierFlags: .command)
     let name = app.textFields["newName"]
     XCTAssertTrue(name.waitForExistence(timeout: 8))

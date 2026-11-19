@@ -69,6 +69,33 @@ extension Image {
 }
 
 extension View {
+  func rakazoSheet<Sheet: View>(isPresented: Binding<Bool>, onDismiss: (() -> Void)? = nil,
+    @ViewBuilder content: @escaping () -> Sheet) -> some View {
+    sheet(isPresented: isPresented, onDismiss: onDismiss) { content().allowsQuitFromSheet() }
+  }
+
+  func rakazoSheet<Item: Identifiable, Sheet: View>(item: Binding<Item?>, onDismiss: (() -> Void)? = nil,
+    @ViewBuilder content: @escaping (Item) -> Sheet) -> some View {
+    sheet(item: item, onDismiss: onDismiss) { content($0).allowsQuitFromSheet() }
+  }
+
+  @ViewBuilder private func allowsQuitFromSheet() -> some View {
+    #if os(macOS)
+      if #available(macOS 15.4, *) { presentationPreventsAppTermination(false) }
+      else { background(LegacySheetQuitPolicy()) }
+    #else
+      self
+    #endif
+  }
+
+  @ViewBuilder func allowsQuitFromDialog() -> some View {
+    #if os(macOS)
+      if #available(macOS 15.4, *) { dialogPreventsAppTermination(false) } else { self }
+    #else
+      self
+    #endif
+  }
+
   @ViewBuilder func inlineMobileTitle() -> some View {
     #if os(iOS)
       navigationBarTitleDisplayMode(.inline)
@@ -84,3 +111,16 @@ extension View {
     #endif
   }
 }
+
+#if os(macOS)
+  private struct LegacySheetQuitPolicy: NSViewRepresentable {
+    final class Probe: NSView {
+      override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        window?.preventsApplicationTerminationWhenModal = false
+      }
+    }
+    func makeNSView(context: Context) -> Probe { Probe() }
+    func updateNSView(_ view: Probe, context: Context) {}
+  }
+#endif

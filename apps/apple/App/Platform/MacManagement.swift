@@ -119,6 +119,14 @@
     @ViewBuilder let content: Content
     @ViewBuilder let footer: Footer
     @State private var height: CGFloat = 280
+    private var viewportHeight: CGFloat {
+      let screenHeight = (NSApp.keyWindow?.screen ?? NSScreen.main)?.visibleFrame.height ?? 710
+      let limit = min(520, max(185, screenHeight - 190))
+      switch session.pages.last?.route {
+      case .skills, .packs, .skill: return limit
+      default: return min(height, limit)
+      }
+    }
     private var identity: (brand: String, symbol: String) {
       switch session.pages.last?.route {
       case .app(let entry), .account(let entry, _), .authorize(let entry):
@@ -193,24 +201,15 @@
               Color.clear.preference(key: ManagementHeight.self, value: proxy.size.height)
             }
           }
-        }.frame(
-          height: min(
-            height,
-            max(
-              185,
-              min(
-                520,
-                (NSApp.keyWindow?.screen ?? NSScreen.main)?.visibleFrame.height.advanced(by: -190)
-                  ?? 490))))
+        }.frame(minHeight: 0, idealHeight: viewportHeight, maxHeight: .infinity)
         Divider()
         HStack(spacing: 9) {
           if session.busy { ProgressView().controlSize(.small) }
           footer
         }.controlSize(.regular)
-          .padding(.horizontal, 18).padding(.vertical, 11).background(MarketStyle.rail)
-      }.frame(width: min(width, (NSScreen.main?.visibleFrame.width ?? width + 40) - 40)).background(
-        MarketStyle.canvas
-      )
+          .padding(.horizontal, 18).padding(.vertical, 11).fixedSize(horizontal: false, vertical: true)
+          .background(MarketStyle.rail)
+      }.frame(minWidth: 0, idealWidth: width, maxWidth: .infinity).background(MarketStyle.canvas)
       .onPreferenceChange(ManagementHeight.self) { if $0 > 0 { height = ceil($0) } }.disabled(
         session.busy)
     }

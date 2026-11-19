@@ -31,6 +31,7 @@ struct DeleteBotConfirmation: ViewModifier {
           )
         }
       }
+      .allowsQuitFromDialog()
       .task(id: target?.id) {
         if let chat = target { groups = await store.removedGroups(chat) } else { groups = [] }
       }

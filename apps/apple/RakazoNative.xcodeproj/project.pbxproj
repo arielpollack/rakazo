@@ -158,7 +158,7 @@
 		995269D4E998FFB60F10F1D6 /* Panels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels.swift; sourceTree = "<group>"; };
 		9A4861EFD2C1344940FC5199 /* ChatAttachments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAttachments.swift; sourceTree = "<group>"; };
 		9E6363880938A03F709E429F /* Sample.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sample.swift; sourceTree = "<group>"; };
-		A4380688CF1259021D032F01 /* Brandmarks */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Brandmarks; path = "Design/Marketplace-assets/Brandmarks"; sourceTree = SOURCE_ROOT; };
+		A4380688CF1259021D032F01 /* Brandmarks */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Brandmarks; path = Resources/Brandmarks; sourceTree = SOURCE_ROOT; };
 		A45C9523887EE04F40E7CAE2 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		A518C594F257296D8F3FD2F9 /* MacChatInteractions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacChatInteractions.swift; sourceTree = "<group>"; };
 		AE08CD0F7561B3525F937972 /* ConversationAccent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationAccent.swift; sourceTree = "<group>"; };

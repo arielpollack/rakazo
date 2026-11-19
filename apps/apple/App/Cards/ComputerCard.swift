@@ -68,7 +68,7 @@ struct ComputerCard: View {
       .task(id: "\(previewKey ?? "")#\(previewReads)") { await loadPreview() }
       .onChange(of: phase) { _, state in if state == .active { previewReads += 1 } }
       .onChange(of: block.state) { releasing = false }
-      .sheet(isPresented: $showingScreen) {
+      .rakazoSheet(isPresented: $showingScreen) {
         if let botChat {
           SampleScreen(store: store, chat: botChat, requestedRun: pending ? message.runId : nil)
         }

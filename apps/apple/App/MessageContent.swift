@@ -168,7 +168,7 @@ struct AttachmentBlock: View {
       Button("OK") { error = nil }
     } message: {
       Text(error ?? "")
-    }
+    }.allowsQuitFromDialog()
   }
   private struct LocalFile: FileDocument {
     static var readableContentTypes: [UTType] { [.data] }

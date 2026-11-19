@@ -215,6 +215,7 @@ struct Conversation: View {
         }
       }
     }
+    .allowsQuitFromDialog()
     .fileImporter(
       isPresented: $picking,
       allowedContentTypes: ChatAttachments.pickerTypes, allowsMultipleSelection: true
@@ -233,8 +234,8 @@ struct Conversation: View {
       Button("OK") { feed.problem = nil }
     } message: {
       Text(feed.problem ?? "")
-    }
-    .sheet(
+    }.allowsQuitFromDialog()
+    .rakazoSheet(
       item: $consent,
       onDismiss: {
         if let request = store.outbox.consent, request.chatId == chat.id {
@@ -508,7 +509,7 @@ struct Bubble: View {
         }.frame(maxWidth: width, alignment: mine ? .trailing : .leading)
       }
     }.frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
-      .sheet(isPresented: $selecting) {
+      .rakazoSheet(isPresented: $selecting) {
         MessageSelection(text: message.selectableText, reply: reply)
       }
   }

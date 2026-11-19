@@ -7,6 +7,19 @@ struct Login: Codable {
 }
 
 enum Vault {
+  private static let usesDataProtection: Bool = {
+    #if os(macOS)
+      var code: SecCode?, executable: SecStaticCode?, information: CFDictionary?
+      guard SecCodeCopySelf([], &code) == errSecSuccess, let code,
+        SecCodeCopyStaticCode(code, [], &executable) == errSecSuccess, let executable,
+        SecCodeCopySigningInformation(executable, [], &information) == errSecSuccess,
+        let flags = (information as NSDictionary?)?[kSecCodeInfoFlags] as? UInt32
+      else { return true }
+      return !SecCodeSignatureFlags(rawValue: flags).contains(.adhoc)
+    #else
+      return true
+    #endif
+  }()
   private static var key: [String: Any] {
     var service = (Bundle.main.bundleIdentifier ?? "dev.rakazo.nativeclient") + ".session"
     #if DEBUG
@@ -21,7 +34,7 @@ enum Vault {
       kSecAttrAccount as String: "active",
     ]
     #if os(macOS)
-      query[kSecUseDataProtectionKeychain as String] = true
+      query[kSecUseDataProtectionKeychain as String] = usesDataProtection
     #endif
     return query
   }
@@ -30,19 +43,18 @@ enum Vault {
     let status = SecItemCopyMatching(
       key.merging([kSecReturnData as String: true]) { $1 } as CFDictionary, &result)
     if status == errSecItemNotFound { return nil }
-    #if os(macOS)
-      if status == errSecMissingEntitlement { return nil }
-    #endif
     guard status == errSecSuccess, let data = result as? Data else {
       throw Failure("Could not unlock the saved session. Unlock this device and try again.")
     }
     return try JSONDecoder().decode(Login.self, from: data)
   }
   static func save(_ login: Login) throws {
-    let attributes: [String: Any] = [
+    var attributes: [String: Any] = [
       kSecValueData as String: try JSONEncoder().encode(login),
-      kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
     ]
+    if usesDataProtection {
+      attributes[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+    }
     let status = SecItemUpdate(key as CFDictionary, attributes as CFDictionary)
     if status == errSecItemNotFound {
       guard SecItemAdd(key.merging(attributes) { $1 } as CFDictionary, nil) == errSecSuccess else {

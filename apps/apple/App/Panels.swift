@@ -116,7 +116,7 @@ struct AccountView: View {
             dismiss()
           } catch { problem = error.localizedDescription }
         }
-      }
+      }.allowsQuitFromDialog()
     }
   }
 }
@@ -214,9 +214,9 @@ struct ConnectionsView: View {
         .toolbar {
           ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
         }.task(id: phase == .active) { if store.demo || phase == .active { await load() } }
-        .sheet(item: $managing, onDismiss: { Task { await load() } }) { account in
+        .rakazoSheet(item: $managing, onDismiss: { Task { await load() } }) { account in
           ConnectionDetails(store: store, account: account).integrationSheet()
-        }.sheet(item: $pending, onDismiss: { Task { await load() } }) { entry in
+        }.rakazoSheet(item: $pending, onDismiss: { Task { await load() } }) { entry in
           if let api = store.client {
             ConnectorAuthorization(
               api: api, provider: entry.slug, connector: entry.connectorId, name: entry.name,
@@ -471,7 +471,7 @@ struct ConnectionDetails: View {
           Button("Disconnect", role: .destructive) { change(revoke: true) }
         } message: {
           Text("Bots in this workspace will no longer be able to use this account.")
-        }
+        }.allowsQuitFromDialog()
     }
   }
   private var clean: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }

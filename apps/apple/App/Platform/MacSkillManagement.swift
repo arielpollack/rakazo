@@ -128,7 +128,7 @@
     private var editable: Bool { original?.editable ?? true }
     var body: some View {
       ManagePage(
-        "Skills  /  " + (original == nil ? "New skill" : editable ? "Edit" : "Read"),
+        "Skills  /  " + (original?.name ?? "New skill"),
         original?.name ?? "New skill",
         original == nil
           ? "Describe a repeatable task in Markdown."
@@ -158,8 +158,7 @@
                 .scrollContentBackground(.hidden).frame(minHeight: 136).accessibilityLabel(
                   "Skill instructions")
             } else {
-              Text(.init(markdownBody)).frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
+              MessageText(content: markdownBody).frame(maxWidth: .infinity, alignment: .leading)
             }
           }
           if let original, editable {
