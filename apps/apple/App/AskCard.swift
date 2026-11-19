@@ -37,7 +37,7 @@ struct AskCard: View {
     VStack(alignment: .leading, spacing: 0) {
       if let text = block.text {
         Text(verbatim: block.instructionUpdate != nil ? "Update instructions?" : Self.plain(text))
-          .font(TypeRole.message.weight(.semibold))
+          .font(TypeRole.message.weight(.medium))
           .foregroundStyle(question && answered ? .secondary : .primary)
           .fixedSize(horizontal: false, vertical: true)
           .textSelection(.enabled)
@@ -47,7 +47,7 @@ struct AskCard: View {
           block.detailFormat == "code"
           || (block.detailFormat == nil && block.approvalEffectId != nil)
         Text(verbatim: detail)
-          .font(code ? .system(.callout, design: .monospaced) : .callout)
+          .font(code ? Self.code : TypeRole.summary)
           .foregroundStyle(
             block.detailFormat == "text" && !(question && answered) ? .primary : .secondary
           )
@@ -65,13 +65,14 @@ struct AskCard: View {
       } else if canAnswer {
         buttons
       } else {
-        Text("No longer active").font(.caption).foregroundStyle(.secondary).padding(
+        Text("No longer active").font(Self.caption).foregroundStyle(.secondary).padding(
           .top, Layout.Space.medium)
       }
     }.padding(.horizontal, Layout.Space.standard).padding(.vertical, 14)
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(
-        Ink.fill, in: RoundedRectangle(cornerRadius: Layout.Radius.bubble, style: .continuous))
+        Ink.fill, in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+      ).frame(maxWidth: 576, alignment: .leading)
   }
 
   /// A question's answers, as a list; the one picked keeps a checkmark.
@@ -93,7 +94,7 @@ struct AskCard: View {
               Image(systemName: "checkmark").foregroundStyle(.secondary)
             }
           }.font(TypeRole.message).padding(.horizontal, 14).padding(.vertical, 11)
-            .frame(maxWidth: .infinity, minHeight: Layout.pointer + 8, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: Layout.touch, alignment: .leading)
             .background(picked ? Ink.selection : Ink.canvas, in: RoundedRectangle(cornerRadius: 12))
             .contentShape(RoundedRectangle(cornerRadius: 12))
         }.buttonStyle(.plain).disabled(inactive)
@@ -135,7 +136,7 @@ struct AskCard: View {
   }
 
   private func outcome(_ text: String, color: Color) -> some View {
-    Text(text).font(.callout.weight(.medium)).foregroundStyle(color).padding(
+    Text(text).font(TypeRole.summary.weight(.medium)).foregroundStyle(color).padding(
       .top, Layout.Space.medium)
   }
 
@@ -190,6 +191,13 @@ struct AskCard: View {
       } catch { report(error.localizedDescription) }
     }
   }
+
+  // The mobile card's caption sizes, on each platform's own scale.
+  #if os(macOS)
+    static let code = Font.system(size: 12, design: .monospaced), caption = Font.system(size: 12)
+  #else
+    static let code = Font.system(.footnote, design: .monospaced), caption = Font.footnote
+  #endif
 
   /// A title as plain text: names in it were escaped for the web's Markdown.
   static func plain(_ text: String) -> String {

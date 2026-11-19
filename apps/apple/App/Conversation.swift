@@ -500,39 +500,44 @@ struct Bubble: View {
           }
         }
       }
-    }.frame(maxWidth: width, alignment: mine ? .trailing : .leading).contentShape(Rectangle())
-      .overlay(alignment: mine ? .topLeading : .topTrailing) {
-        if stored && showsControls {
-          HStack(spacing: 2) {
-            if canReact {
-              Button {
-                picker.toggle()
-              } label: {
-                icon("face.smiling")
-              }.accessibilityLabel("React").help("React")
-                .popover(isPresented: $picker) {
-                  HStack(spacing: 0) { emojiButtons }.padding(6).presentationCompactAdaptation(
-                    .popover)
-                }
-            }
+    }
+    // Beside the message, as on the web, so they never cover what it says.
+    .overlay(alignment: mine ? .leading : .trailing) {
+      if stored && showsControls {
+        HStack(spacing: 2) {
+          if canReact {
             Button {
-              reply(nil)
+              picker.toggle()
             } label: {
-              icon("arrowshape.turn.up.left")
-            }.accessibilityLabel("Reply").help("Reply")
-            Menu {
-              menuItems
-            } label: {
-              icon("ellipsis")
-            }.menuIndicator(.hidden).accessibilityLabel("More message actions")
-          }.buttonStyle(.plain).padding(.horizontal, 3).background(.regularMaterial, in: Capsule())
-        }
+              icon("face.smiling")
+            }.accessibilityLabel("React").help("React")
+              .popover(isPresented: $picker) {
+                HStack(spacing: 0) { emojiButtons }.padding(6).presentationCompactAdaptation(
+                  .popover)
+              }
+          }
+          Button {
+            reply(nil)
+          } label: {
+            icon("arrowshape.turn.up.left")
+          }.accessibilityLabel("Reply").help("Reply")
+          Menu {
+            menuItems
+          } label: {
+            icon("ellipsis")
+          }.menuIndicator(.hidden).accessibilityLabel("More message actions")
+        }.buttonStyle(.plain).padding(.horizontal, 3).background(.regularMaterial, in: Capsule())
+          .fixedSize().padding(mine ? .trailing : .leading, 6)
+          .frame(width: 0, alignment: mine ? .trailing : .leading)
       }
-      .onHover { hovering = $0 }
-      .frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
-      .sheet(isPresented: $selecting) {
-        MessageSelection(text: message.selectableText, reply: reply)
-      }
+    }
+    .frame(maxWidth: width, alignment: mine ? .trailing : .leading)
+    .frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
+    .contentShape(Rectangle())
+    .onHover { hovering = $0 }
+    .sheet(isPresented: $selecting) {
+      MessageSelection(text: message.selectableText, reply: reply)
+    }
   }
   var showsControls: Bool {
     #if os(macOS)
