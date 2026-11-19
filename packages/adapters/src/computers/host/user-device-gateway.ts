@@ -45,7 +45,7 @@ const REVOKED_MESSAGE = "This computer was disconnected from Rakazo.";
 export const USER_DEVICE_LIMIT = 10;
 const PING_INTERVAL_MS = 25_000;
 /** A connection row older than this has lost its holding process. */
-const STALE_AFTER_MS = 3 * PING_INTERVAL_MS;
+export const USER_DEVICE_STALE_AFTER_MS = 3 * PING_INTERVAL_MS;
 const MAX_MESSAGE_BYTES = HOST_COMPUTER_MAX_BYTES + 64 * 1024;
 
 export class UserDeviceOfflineError extends Error {
@@ -65,7 +65,7 @@ export async function onlineUserDevices(
     prisma.userDeviceConnection.findMany({
       where: {
         deviceId: { in: [...new Set(deviceIds)] },
-        heartbeatAt: { gt: new Date(Date.now() - STALE_AFTER_MS) },
+        heartbeatAt: { gt: new Date(Date.now() - USER_DEVICE_STALE_AFTER_MS) },
         device: { revokedAt: null },
       },
       select: { deviceId: true },
@@ -642,7 +642,7 @@ export class UserDevices implements UserDeviceGateway, UserDeviceAgentLink {
           name: true,
           modelProviders: true,
           connections: {
-            where: { heartbeatAt: { gt: new Date(Date.now() - STALE_AFTER_MS) } },
+            where: { heartbeatAt: { gt: new Date(Date.now() - USER_DEVICE_STALE_AFTER_MS) } },
             select: { deviceId: true },
           },
         },
@@ -757,7 +757,7 @@ export class UserDevices implements UserDeviceGateway, UserDeviceAgentLink {
     const connection = await runAsSystem("find a user's connected device", () =>
       this.deps.prisma.userDeviceConnection.findFirst({
         where: {
-          heartbeatAt: { gt: new Date(Date.now() - STALE_AFTER_MS) },
+          heartbeatAt: { gt: new Date(Date.now() - USER_DEVICE_STALE_AFTER_MS) },
           device: { userId, revokedAt: null },
           ...(deviceId ? { deviceId } : {}),
         },

@@ -17,6 +17,7 @@ import {
 } from "@rakazo/db";
 import { getLogger, runCorrelatedJob } from "@rakazo/logging";
 import type { Pool } from "pg";
+import { USER_DEVICE_STALE_AFTER_MS } from "../../computers/host/user-device-gateway.js";
 import { RunExecutionHost } from "../lifecycle/run-execution.js";
 import { findRunRecoveryBlockers } from "../lifecycle/run-recovery.js";
 
@@ -315,7 +316,7 @@ export class RunWorkerHost implements JobWorkerHost {
   /**
    * Runs waiting for their own bot's earlier run on its computer are expected to wait, including
    * in the handoff after that run releases the computer (release expires the lease and touches
-   * `updatedAt`) until the next one takes it.
+   * `updatedAt`) until the next one takes it. So are runs of a bot whose owner's computer is offline.
    * Any other run still unstarted thirty seconds after it was due means starting failed,
    * which is an error reported with this process's database pool and event-loop health. A run
    * is due from its last write, so one resumed after an approval or reply is not counted late.
@@ -345,6 +346,15 @@ export class RunWorkerHost implements JobWorkerHost {
             WHERE lease."botId" = runs."botId" AND lease."computerId" = bot."computerId"
               AND lease."runId" <> runs.id
               AND (lease."expiresAt" > ${new Date(now)} OR lease."updatedAt" > ${cutoff})
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM computers home
+            WHERE home.id = bot."computerId" AND home."deviceId" IS NOT NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM user_device_connections link
+                WHERE link."deviceId" = home."deviceId"
+                  AND link."heartbeatAt" > ${new Date(now - USER_DEVICE_STALE_AFTER_MS)}
+              )
           )
       `;
       if (this.stopping) return;

@@ -192,6 +192,81 @@ describePostgres("direct run dispatch (PostgreSQL)", () => {
     }
   });
 
+  it("does not report runs waiting for their owner's computer to come online", async () => {
+    const now = Date.now();
+    const device = await system.userDevice.create({
+      data: {
+        userId: identity.userId,
+        name: "Test Mac",
+        platform: "darwin",
+        tokenHash: randomUUID(),
+      },
+    });
+    const computer = await system.computer.create({
+      data: {
+        spaceId: identity.spaceId,
+        userId: identity.userId,
+        scopeKey: `queue-device-${randomUUID()}`,
+        homeKey: `queue-device-${randomUUID()}`,
+        kind: "user-device",
+        deviceId: device.id,
+      },
+    });
+    const { computerId: previous } = await system.bot.findUniqueOrThrow({
+      where: { id: identity.botId },
+      select: { computerId: true },
+    });
+    await system.bot.update({ where: { id: identity.botId }, data: { computerId: computer.id } });
+    const waiting = await createRun();
+    await system.run.update({
+      where: { id: waiting.id },
+      data: { createdAt: new Date(now - 3_600_000), updatedAt: new Date(now - 3_600_000) },
+    });
+    const sink = createTestSink();
+    installLogger(createLogger({ service: "test", sinks: [sink] }));
+    const realtime = new InMemoryRealtimeFanout();
+    const offline = new RunWorkerHost(db.prisma, realtime, new RunStarter(realtime));
+    const online = new RunWorkerHost(db.prisma, realtime, new RunStarter(realtime));
+    const queryRaw = db.prisma.$queryRaw.bind(db.prisma);
+    let queueChecksSettled = 0;
+    const querySpy = vi.spyOn(db.prisma, "$queryRaw").mockImplementation((async (
+      query: unknown,
+      ...values: unknown[]
+    ) => {
+      const result = queryRaw(query as never, ...(values as never[]));
+      const settle = () => {
+        queueChecksSettled += 1;
+      };
+      void Promise.resolve(result).then(settle, settle);
+      return result;
+    }) as never);
+    try {
+      await offline.start({} as BackgroundJobHandlers);
+      await wait(() => expect(queueChecksSettled).toBeGreaterThan(0));
+      await offline.stop();
+      expect(sink.events.some((event) => event.message === "run.queue_delayed")).toBe(false);
+
+      // Connected and still not started: that is a failure to start again.
+      await system.userDeviceConnection.create({
+        data: { deviceId: device.id, connectionId: randomUUID(), address: "http://10.0.0.5:3100" },
+      });
+      await online.start({} as BackgroundJobHandlers);
+      await wait(() =>
+        expect(sink.events.find((event) => event.message === "run.queue_delayed")).toMatchObject({
+          "queue.oldest_run_id": waiting.id,
+        }),
+      );
+    } finally {
+      querySpy.mockRestore();
+      await offline.stop();
+      await online.stop();
+      installLogger(createLogger({ service: "test", level: "off", sinks: [] }));
+      await system.run.updateMany({ where: { id: waiting.id }, data: { status: "cancelled" } });
+      await system.bot.update({ where: { id: identity.botId }, data: { computerId: previous } });
+      await system.userDevice.delete({ where: { id: device.id } });
+    }
+  });
+
   it("starts model work while a normal computer lease is busy", async () => {
     const computer = await system.computer.create({
       data: {
