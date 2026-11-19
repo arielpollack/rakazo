@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
 
-const source = await readFile(new URL('../../../packages/adapters/src/providers/integration/composio/composio-fake.ts', import.meta.url), 'utf8');
+const fixture = process.argv[2];
+if (!fixture) throw new Error('Usage: node Tools/sample-catalog.mjs <integration-directory-fixture.ts>');
+const source = await readFile(fixture, 'utf8');
 const directory = source.match(/const DEFAULT_DIRECTORY:[^=]*= \[([\s\S]+?)\n\];/)[1];
 const apps = [...directory.matchAll(/slug: "(\w+)", name: "([^"]+)", logo: null, noAuth: (true|false)/g)].map(([, slug, name, noAuth]) => {
   const block = source.match(new RegExp(`const ${slug}_TOOLS: SessionTools = \\[([\\s\\S]+?)\\n\\];`));

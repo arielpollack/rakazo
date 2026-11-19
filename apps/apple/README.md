@@ -25,6 +25,8 @@ A SwiftUI client for an existing Rakazo server. One multiplatform target builds 
 
 The catalog ships with the app. The sample walkthroughs do not contact a provider, install an MCP package, or read your screen or accounts. Existing sample workspaces gain the walkthroughs without a reset.
 
+To refresh the bundled catalog, run `node Tools/sample-catalog.mjs <integration-directory-fixture.ts>` with the upstream test fixture. It prints the catalog JSON; review it before replacing `App/sample-catalog.json`.
+
 ## Native workflows
 
 | Surface | What you can do |
@@ -87,8 +89,7 @@ bash Tools/test-chat-activity.sh --server
 # Switch between short and multi-screen histories and verify the newest bubble is painted.
 # Also check mixed message formats and chat switching on a disposable release server.
 # The fixture puts 510 background deliveries after a bot's saved conversation; no desktop input.
-files=(App/*.swift App/Platform/*.swift)
-swiftc -whole-module-optimization ${files:#App/RakazoApp.swift} Tools/ChatHistorySmoke.swift -o .build/chat-history-smoke
+bash Tools/compile-mac-smoke.sh Tools/ChatHistorySmoke.swift .build/chat-history-smoke
 .build/chat-history-smoke
 ./Tools/with-upstream.sh --chat-history .build/chat-history-smoke --release-server
 
@@ -96,27 +97,22 @@ swiftc -whole-module-optimization ${files:#App/RakazoApp.swift} Tools/ChatHistor
 ./Tools/with-upstream.sh bash Tools/test-mac-session.sh
 
 # Offline tests: no account, provider, Docker, device input or mounted environment file.
-core=(App/{Models,Connection,Sample,SampleComputer,IntegrationLibrary,WorkspaceStore,PrivateSpace,MarketplaceCatalog,ManagedIntegrations,ManagedServers}.swift)
-swiftc "${core[@]}" \
-  Tools/SampleFlowSmoke.swift -o .build/sample-smoke
+bash Tools/compile-mac-smoke.sh Tools/SampleFlowSmoke.swift .build/sample-smoke
 .build/sample-smoke App/sample-catalog.json
 
 # Space creation, retry and selection: offline, then saved choices on the real local release.
-swiftc "${core[@]}" \
-  Tools/PrivateSpaceSmoke.swift -o .build/private-space-smoke
+bash Tools/compile-mac-smoke.sh Tools/PrivateSpaceSmoke.swift .build/private-space-smoke
 .build/private-space-smoke
 ./Tools/with-upstream.sh .build/private-space-smoke --release-server
 
 # Native Mac layout and quick-connect state checks; zsh, no visible windows or desktop input.
 out=.build/marketplace/native; mkdir -p "$out"; cp App/sample-catalog.json "$out/"
 ditto Resources/Brandmarks "$out/Brandmarks"
-files=(App/*.swift App/Platform/*.swift)
-swiftc -whole-module-optimization ${files:#App/RakazoApp.swift} Tools/MarketRenderSmoke.swift -o "$out/market-render"
+bash Tools/compile-mac-smoke.sh Tools/MarketRenderSmoke.swift "$out/market-render"
 "$out/market-render" "$out"
 
 # Real release API, disposable account: read the marketplace and verify MCP grant and revoke.
-swiftc "${core[@]}" \
-  Tools/IntegrationServerSmoke.swift -o .build/integration-server-smoke
+bash Tools/compile-mac-smoke.sh Tools/IntegrationServerSmoke.swift .build/integration-server-smoke
 ./Tools/with-upstream.sh .build/integration-server-smoke
 
 # Sample feature journeys on a disposable simulator; substitute its UUID.

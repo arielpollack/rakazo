@@ -14,11 +14,7 @@ plutil -insert CFBundleIdentifier -string dev.rakazo.test.avatarart "$plist"
 plutil -insert CFBundleExecutable -string Smoke "$plist"
 plutil -insert CFBundlePackageType -string APPL "$plist"
 cp "$derived/Build/Products/Release/Rakazo Mac.app/Contents/Resources/Assets.car" "$app/Contents/Resources/"
-sources=()
-for source in App/*.swift App/Platform/*.swift; do
-  [[ $source == App/RakazoApp.swift ]] || sources+=("$source")
-done
-swiftc -whole-module-optimization "${sources[@]}" Tools/ChatActivitySmoke.swift -o "$exe"
+bash Tools/compile-mac-smoke.sh Tools/ChatActivitySmoke.swift "$exe"
 "$exe" "$out/frames"
 if [[ ${1:-} == --server ]]; then
   bash Tools/with-upstream.sh "$exe" --server

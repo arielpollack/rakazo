@@ -12,9 +12,5 @@ plutil -insert CFBundleIdentifier -string dev.rakazo.test.chatactions "$bundle/I
 plutil -insert CFBundleExecutable -string Smoke "$bundle/Info.plist"
 plutil -insert CFBundlePackageType -string APPL "$bundle/Info.plist"
 cp "$derived/Build/Products/Release/Rakazo Mac.app/Contents/Resources/Assets.car" "$bundle/Resources/"
-sources=()
-for source in App/*.swift App/Platform/*.swift; do
-  [[ $source == App/RakazoApp.swift ]] || sources+=("$source")
-done
-swiftc -whole-module-optimization "${sources[@]}" Tools/ChatInteractionSmoke.swift -o "$bundle/MacOS/Smoke"
+bash Tools/compile-mac-smoke.sh Tools/ChatInteractionSmoke.swift "$bundle/MacOS/Smoke"
 "$bundle/MacOS/Smoke" "$out/frames"

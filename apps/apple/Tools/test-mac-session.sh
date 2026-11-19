@@ -14,7 +14,7 @@ plutil -insert CFBundleExecutable -string SessionSmoke "$plist"
 plutil -insert CFBundlePackageType -string APPL "$plist"
 plutil -insert CFBundleVersion -string 1 "$plist"
 plutil -insert LSBackgroundOnly -bool YES "$plist"
-swiftc App/{Models,Connection,Sample,SampleComputer,IntegrationLibrary,WorkspaceStore,PrivateSpace,MarketplaceCatalog,ManagedIntegrations,ManagedServers}.swift Tools/MacSessionSmoke.swift -o "$exe"
+bash Tools/compile-mac-smoke.sh Tools/MacSessionSmoke.swift "$exe"
 codesign --force --sign - --options runtime --entitlements Config/RakazoMac.entitlements "$app"
 trap '"$exe" clean' EXIT
 "$exe" sign-in
