@@ -23,6 +23,7 @@ import {
   BotSchema,
   BotSectionName,
   BotSectionSchema,
+  ComputerModelChoiceSchema,
   CreateBotInput,
   ReorderBotsInput,
   UpdateBotInput,
@@ -75,6 +76,15 @@ export const botsRpc = {
       )
       .output(BotSchema),
     setComputer: oc.input(z.object({ botId: Id, mode: ComputerModeSchema })).output(BotSchema),
+    setComputerDevice: oc.input(z.object({ botId: Id, deviceId: Id.nullable() })).output(BotSchema),
+    /** The models a bot on its owner's computer can use; empty while it runs on the server. */
+    computerModels: oc.input(botId).output(
+      z.object({
+        models: z.array(ComputerModelChoiceSchema),
+        /** The model its next turn uses: its own when the computer signs in to it, else the default. */
+        current: z.object({ provider: z.string(), id: z.string() }).nullable(),
+      }),
+    ),
     archive: oc.input(botId).output(z.object({ ok: z.literal(true) })),
     restore: oc.input(botId).output(z.object({ ok: z.literal(true) })),
     remove: oc

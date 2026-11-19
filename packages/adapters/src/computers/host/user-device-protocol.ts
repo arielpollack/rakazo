@@ -7,20 +7,67 @@ export const userDeviceRevokeReason = z.enum(["session-ended"]);
 export const USER_DEVICE_REVOKED_HEADER = "x-rakazo-device-revoked";
 export type UserDeviceRevokeReason = z.infer<typeof userDeviceRevokeReason>;
 
+const messageId = z.string().min(1).max(64);
+
+/**
+ * One agent turn for a bot that runs on the device: the turn's request without its callbacks,
+ * secrets or the server's model credentials. The device runs the loop and the model itself.
+ */
+export const userDeviceAgentRun = z.object({
+  botId: z.string().min(1).max(256),
+  runId: z.string().min(1).max(256),
+  request: z.record(z.string(), z.unknown()),
+});
+export type UserDeviceAgentRun = z.infer<typeof userDeviceAgentRun>;
+
+/** What a turn on the device asks the server to do: run a tool, save a checkpoint, and so on. */
+export const userDeviceAgentCall = z.object({
+  id: z.string().min(1).max(64),
+  name: z.enum([
+    "executeTool",
+    "onToolCompleted",
+    "claimSteering",
+    "onCheckpoint",
+    "onModelChange",
+    "resolveModel",
+    "resolveFallbackModel",
+    "onUsage",
+  ]),
+  args: z.array(z.unknown()).max(8),
+});
+export type UserDeviceAgentCall = z.infer<typeof userDeviceAgentCall>;
+
 export const userDeviceServerMessage = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("request"),
-    id: z.string().min(1).max(64),
+    id: messageId,
     request: hostComputerRequest,
   }),
-  z.object({ type: z.literal("cancel"), id: z.string().min(1).max(64) }),
+  z.object({ type: z.literal("agent"), id: messageId, run: userDeviceAgentRun }),
+  /** The server's answer to one call an agent turn made. */
+  z.object({
+    type: z.literal("reply"),
+    id: messageId,
+    callId: z.string().min(1).max(64),
+    value: z.unknown().optional(),
+    error: z.string().optional(),
+  }),
+  z.object({ type: z.literal("cancel"), id: messageId }),
   // "session-ended": the sign-in that paired it ended, so the next sign-in pairs again.
   z.object({ type: z.literal("revoked"), reason: userDeviceRevokeReason.optional() }),
 ]);
 
-/** One HostComputerFrame per message, tagged with the request id. */
+/**
+ * One HostComputerFrame per message, tagged with the request id. An agent turn also sends
+ * `{ call: UserDeviceAgentCall }` frames, each answered by a `reply` message.
+ */
 export const userDeviceClientMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("frame"), id: z.string().min(1).max(64), frame: z.unknown() }),
+  /** The model providers this computer signs in to by itself, sent each time it connects. */
+  z.object({
+    type: z.literal("models"),
+    providers: z.array(z.string().min(1).max(64)).max(64),
+  }),
 ]);
 export type UserDeviceClientMessage = z.infer<typeof userDeviceClientMessage>;
 
@@ -48,4 +95,20 @@ export interface UserDeviceGateway {
     signal: AbortSignal,
     deviceId?: string,
   ): AsyncIterable<T>;
+}
+
+/** One agent turn running on a device: what it streams, and how the server answers its calls. */
+export interface UserDeviceAgentSession {
+  frames: AsyncIterable<{ event: unknown } | { call: UserDeviceAgentCall }>;
+  reply(callId: string, outcome: { value?: unknown; error?: string }): Promise<void>;
+}
+
+/** Runs agent turns on a user's device, from any API or worker process. */
+export interface UserDeviceAgentLink {
+  agentSession(
+    userId: string,
+    deviceId: string,
+    run: UserDeviceAgentRun,
+    signal: AbortSignal,
+  ): Promise<UserDeviceAgentSession>;
 }

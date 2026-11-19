@@ -27,7 +27,9 @@ import {
   fakeNovita,
 } from "../../providers/computer/novita/novita-sandbox.test-support.js";
 import { emulatedRailway } from "../../providers/computer/railway/railway-sandbox.test-support.js";
+import { UserDeviceSandbox } from "../../providers/computer/user-device/user-device-sandbox.js";
 import { FakeWuyingDesktop } from "../../providers/computer/wuying/wuying-sandbox.test-support.js";
+import { runnerUserDeviceGateway } from "../host/user-device-runner.test-support.js";
 import { toComputerRef } from "../screens/computer-support.js";
 import { createSandboxProvider } from "./sandbox-factory.js";
 import type { KnownSandboxKind } from "./sandbox-kind-capabilities.js";
@@ -110,6 +112,17 @@ const fixtures: Record<KnownSandboxKind, SandboxConformanceFixture> = {
   daytona: { provider: () => emulatedDaytona().provider, workspace: true, unsetEnv: true },
   railway: { provider: () => emulatedRailway().provider, workspace: false, unsetEnv: true },
   "local-vm": { provider: () => fakeCli().provider, workspace: false, unsetEnv: false },
+  "user-device": {
+    provider: () =>
+      new UserDeviceSandbox(runnerUserDeviceGateway(temporaryRoot()), async () => ({
+        userId: "u",
+        deviceId: "runner-device",
+        deviceName: "Runner Mac",
+      })),
+    // No screen on a paired computer yet; the device suite covers its files.
+    workspace: false,
+    unsetEnv: true,
+  },
 };
 
 const running = Object.entries(fixtures).flatMap(([kind, fixture]) =>

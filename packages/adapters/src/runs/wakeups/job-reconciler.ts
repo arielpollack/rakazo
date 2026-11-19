@@ -249,7 +249,7 @@ export function createJobReconciler(
           updatedAt: true,
           botId: true,
           trigger: true,
-          bot: { select: { computerId: true } },
+          bot: { select: { computerId: true, computer: { select: { deviceId: true } } } },
         },
       });
 

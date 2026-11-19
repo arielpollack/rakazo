@@ -77,6 +77,8 @@ import Foundation
   }
   @Published var account: Account?
   @Published var navigation: NavigationData?
+  /// The account's paired computers, re-read with the workspace when one connects or leaves.
+  @Published var devices: [UserDevices.Device] = []
   @Published var selected: String? { didSet { if oldValue != selected { anchorMessage = nil } } }
   @Published var anchorMessage: String?
   @Published var error: String?
@@ -118,17 +120,25 @@ import Foundation
       server: login.server, token: login.token, space: space ?? navigation?.current.id)
     async let nav: NavigationData = api.rpc("spaces/list")
     async let user: Account = api.rpc("me")
+    // A server without paired computers, or without the endpoint, has none.
+    async let paired = try? api.get("api/devices", as: UserDevices.self)
     let (next, me) = try await (nav, user)
+    let computers = await paired
     try Task.checkCancellation()
     guard generation == ticket else { return }
     let changed = navigation?.current.id != next.current.id
     navigation = next
     account = me
+    devices = computers?.devices ?? []
     if changed || !containsSelected {
       selected = nil
       anchorMessage = nil
     }
     error = nil
+  }
+  /// The paired computer a bot runs on, while the account still has it.
+  func device(of chat: Chat) -> UserDevices.Device? {
+    chat.computerDeviceId.flatMap { id in devices.first { $0.deviceId == id } }
   }
   private var containsSelected: Bool {
     navigation?.current.chats.contains { $0.id == selected } == true
@@ -176,6 +186,29 @@ import Foundation
       if let instructions { current.instructions = instructions }
       if let pinned { current.pinned = pinned }
       if let newRoster { current.members = newRoster }
+    }
+  }
+  /// Moves a bot to one of the account's paired computers, or back to the server with nil.
+  func setComputerDevice(_ chat: Chat, deviceId: String?) async throws -> String? {
+    guard let api = client else { return chat.computerDeviceId }
+    let space = navigation?.current.id
+    let bot: Chat = try await api.rpc(
+      "bots/setComputerDevice", ["botId": chat.id, "deviceId": deviceId.map { $0 as Any } ?? NSNull()])
+    if navigation?.current.id == space {
+      modifyChat(chat) { $0.computerDeviceId = bot.computerDeviceId }
+    }
+    return bot.computerDeviceId
+  }
+  /// Sets a bot's model; the server checks it is one the bot's computer signs in to.
+  func setModel(_ chat: Chat, provider: String, id: String) async throws {
+    guard let api = client else { return }
+    let space = navigation?.current.id
+    let _: Empty = try await api.rpc(
+      "bots/update", ["botId": chat.id, "modelProvider": provider, "modelId": id])
+    guard navigation?.current.id == space else { return }
+    modifyChat(chat) {
+      $0.modelProvider = provider
+      $0.modelId = id
     }
   }
   func mark(_ chat: Chat, unread: Bool, from messageID: String? = nil) async throws {

@@ -444,7 +444,7 @@ export class RunWorkerHost implements JobWorkerHost {
         botId: true,
         status: true,
         trigger: true,
-        bot: { select: { computerId: true } },
+        bot: { select: { computerId: true, computer: { select: { deviceId: true } } } },
       },
     });
     // The executor still acquires the lease atomically to handle races here.

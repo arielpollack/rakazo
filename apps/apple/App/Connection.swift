@@ -96,19 +96,31 @@ struct Client {
     else { throw Failure("Use HTTPS for your server, or HTTP on localhost for development.") }
     return url
   }
-  func request(_ path: String, body: [String: Any]) throws -> URLRequest {
+  func request(_ path: String, body: [String: Any]?, method: String = "POST") throws -> URLRequest {
     var request = URLRequest(url: server.appendingPathComponent(path))
-    request.httpMethod = "POST"
-    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpMethod = method
     request.setValue("rakazo://", forHTTPHeaderField: "Origin")
     request.setValue("mobile/20261118000000", forHTTPHeaderField: "x-rakazo-client-build")
     if let token { request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization") }
     if let space { request.setValue(space, forHTTPHeaderField: "x-rakazo-space-id") }
-    request.httpBody = try JSONSerialization.data(withJSONObject: body)
+    if let body {
+      request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+      request.httpBody = try JSONSerialization.data(withJSONObject: body)
+    }
     return request
   }
   func post(_ path: String, _ body: [String: Any]) async throws -> (Data, HTTPURLResponse) {
-    let (data, raw) = try await Self.transport.data(for: request(path, body: body))
+    try await send("POST", path, body)
+  }
+  func get<Value: Decodable>(_ path: String, as type: Value.Type = Value.self) async throws -> Value {
+    let (data, _) = try await send("GET", path)
+    return try JSONDecoder().decode(Value.self, from: data)
+  }
+  func send(_ method: String, _ path: String, _ body: [String: Any]? = nil) async throws -> (
+    Data, HTTPURLResponse
+  ) {
+    let (data, raw) = try await Self.transport.data(
+      for: request(path, body: body, method: method))
     guard let response = raw as? HTTPURLResponse else {
       throw Failure("The server returned an invalid response.")
     }
@@ -116,7 +128,7 @@ struct Client {
       let payload = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
       let details = payload?["json"] as? [String: Any] ?? payload
       throw Failure(
-        details?["message"] as? String
+        details?["message"] as? String ?? payload?["error"] as? String
           ?? "Rakazo returned HTTP \(response.statusCode). Check your server and sign-in.")
     }
     return (data, response)

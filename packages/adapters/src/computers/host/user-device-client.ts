@@ -1,12 +1,21 @@
+import { randomUUID } from "node:crypto";
+import type { AgentRuntime } from "@rakazo/adapter-kit";
 import { USER_DEVICE_CONNECT_PATH } from "@rakazo/contracts";
 import { secureHttpOrigin } from "@rakazo/contracts/network-host";
+import { bestEffort } from "@rakazo/logging";
 import WebSocket from "ws";
+import { runAgentOnDevice } from "../../runtime/device/agent-run-wire.js";
 import type { HostScreen } from "../screens/host-screen.js";
 import type { HostComputerFrame } from "./host-computer-protocol.js";
 import { HOST_COMPUTER_MAX_BYTES } from "./host-computer-protocol.js";
 import type { HostComputerCall } from "./host-computer-runner.js";
 import { createHostComputerRunner } from "./host-computer-runner.js";
-import type { UserDeviceClientMessage, UserDeviceRevokeReason } from "./user-device-protocol.js";
+import type {
+  UserDeviceAgentCall,
+  UserDeviceAgentRun,
+  UserDeviceClientMessage,
+  UserDeviceRevokeReason,
+} from "./user-device-protocol.js";
 import {
   USER_DEVICE_REVOKED_HEADER,
   userDeviceRevokeReason,
@@ -29,6 +38,10 @@ export interface UserDeviceClientOptions {
   onRevoked: (reason?: UserDeviceRevokeReason) => void;
   /** Whether this computer lets the server's bots run anything. Asked before every request. */
   authorize: () => Promise<boolean>;
+  /** Runs the whole turn of a bot that lives on this computer, model calls included. */
+  agent?: AgentRuntime;
+  /** The model providers this computer signs in to by itself, reported each time it connects. */
+  modelProviders?: () => Promise<string[]>;
   retryMs?: { min: number; max: number };
 }
 
@@ -96,6 +109,14 @@ export function startUserDeviceClient(options: UserDeviceClientOptions) {
       { call: HostComputerCall; cancelled: boolean; settled: boolean }
     >();
     const authorizing = new Set<string>();
+    /** Agent turns running here, each with the calls it is waiting on the server for. */
+    const turns = new Map<
+      string,
+      {
+        controller: AbortController;
+        waiting: Map<string, { resolve(value: unknown): void; reject(error: Error): void }>;
+      }
+    >();
     let alive = true;
     let openedAt = 0;
     let ping: NodeJS.Timeout | undefined;
@@ -125,6 +146,7 @@ export function startUserDeviceClient(options: UserDeviceClientOptions) {
         ws.ping();
       }, PING_INTERVAL_MS);
       ping.unref();
+      if (options.modelProviders) void reportModels(options.modelProviders);
     });
     ws.on("pong", () => {
       alive = true;
@@ -137,6 +159,8 @@ export function startUserDeviceClient(options: UserDeviceClientOptions) {
       // A lost response is never retried, so in-flight work stops with the connection.
       for (const { call } of calls.values()) call.abort();
       calls.clear();
+      for (const turn of turns.values()) turn.controller.abort(new Error("Disconnected"));
+      turns.clear();
       if (socket === ws) {
         socket = undefined;
         refuseWaiting = undefined;
@@ -159,8 +183,18 @@ export function startUserDeviceClient(options: UserDeviceClientOptions) {
         revoked(message.reason);
         return;
       }
+      if (message.type === "reply") {
+        const waiting = turns.get(message.id)?.waiting;
+        const pending = waiting?.get(message.callId);
+        if (!pending) return;
+        waiting?.delete(message.callId);
+        if (message.error !== undefined) pending.reject(new Error(message.error));
+        else pending.resolve(message.value ?? null);
+        return;
+      }
       if (message.type === "cancel") {
         authorizing.delete(message.id);
+        turns.get(message.id)?.controller.abort(new Error("Stopped"));
         const entry = calls.get(message.id);
         if (entry) {
           entry.cancelled = true;
@@ -168,11 +202,19 @@ export function startUserDeviceClient(options: UserDeviceClientOptions) {
         }
         return;
       }
-      if (calls.has(message.id) || authorizing.has(message.id)) return;
-      void handle(message.id, message.request);
+      if (calls.has(message.id) || authorizing.has(message.id) || turns.has(message.id)) return;
+      if (message.type === "agent") void handleAgent(message.id, message.run);
+      else if (message.type === "request") void handle(message.id, message.request);
     });
 
-    function send(id: string, frame: HostComputerFrame<unknown>) {
+    async function reportModels(list: () => Promise<string[]>) {
+      const providers = await bestEffort("list this computer's model providers", list());
+      if (!providers || ws.readyState !== WebSocket.OPEN) return;
+      const message: UserDeviceClientMessage = { type: "models", providers };
+      ws.send(JSON.stringify(message));
+    }
+
+    function send(id: string, frame: HostComputerFrame<unknown> | { call: UserDeviceAgentCall }) {
       const entry = calls.get(id);
       let body = JSON.stringify({ type: "frame", id, frame } satisfies UserDeviceClientMessage);
       if (Buffer.byteLength(body) > USER_DEVICE_MAX_MESSAGE_BYTES) {
@@ -221,6 +263,68 @@ export function startUserDeviceClient(options: UserDeviceClientOptions) {
       } finally {
         call.end();
         if (calls.get(id) === entry) calls.delete(id);
+      }
+    }
+
+    async function handleAgent(id: string, run: UserDeviceAgentRun) {
+      authorizing.add(id);
+      const allowed =
+        (await bestEffort("ask whether this computer runs bots", options.authorize())) ?? false;
+      if (!authorizing.delete(id) || socket !== ws) return;
+      if (!allowed || !options.agent) {
+        const refusal = allowed ? "This computer does not run bots" : NOT_ALLOWED_MESSAGE;
+        await bestEffort("refuse a bot's turn", send(id, { error: refusal }));
+        return;
+      }
+      const turn = {
+        controller: new AbortController(),
+        waiting: new Map<string, { resolve(value: unknown): void; reject(error: Error): void }>(),
+      };
+      turns.set(id, turn);
+      const { signal } = turn.controller;
+      // A stopped turn fails the calls it is waiting on, so the loop ends instead of hanging.
+      signal.addEventListener(
+        "abort",
+        () => {
+          for (const pending of turn.waiting.values())
+            pending.reject(signal.reason instanceof Error ? signal.reason : new Error("Stopped"));
+          turn.waiting.clear();
+          void options.agent?.abort(run.runId);
+        },
+        { once: true },
+      );
+      try {
+        const events = runAgentOnDevice(options.agent, run, {
+          signal,
+          call: (name, args) =>
+            new Promise((resolve, reject) => {
+              if (signal.aborted) {
+                reject(new Error("Stopped"));
+                return;
+              }
+              const callId = randomUUID();
+              turn.waiting.set(callId, { resolve, reject });
+              send(id, { call: { id: callId, name, args } }).catch((error: unknown) => {
+                turn.waiting.delete(callId);
+                reject(error instanceof Error ? error : new Error("Local computer disconnected"));
+              });
+            }),
+        });
+        for await (const event of events) {
+          if (signal.aborted) return;
+          await send(id, { value: event });
+        }
+        if (!signal.aborted) await send(id, { done: true });
+      } catch (error) {
+        if (!signal.aborted)
+          await bestEffort(
+            "report a failed bot turn",
+            send(id, {
+              error: error instanceof Error ? error.message : "The turn failed on this computer",
+            }),
+          );
+      } finally {
+        if (turns.get(id) === turn) turns.delete(id);
       }
     }
   }

@@ -13,6 +13,7 @@ import { appleContainerComputer } from "../providers/computer/local-vm/apple-con
 import { noneComputer } from "../providers/computer/none/none-computer.js";
 import { novitaComputer } from "../providers/computer/novita/novita-computer.js";
 import { railwayComputer } from "../providers/computer/railway/railway-computer.js";
+import { userDeviceComputer } from "../providers/computer/user-device/user-device-computer.js";
 import { wuyingComputer } from "../providers/computer/wuying/wuying-computer.js";
 import type { ComputerProviderDefinition } from "./computer-provider-descriptor.js";
 
@@ -36,6 +37,7 @@ export const computerProviders = {
   incus: incusComputer,
   "local-vm": appleContainerComputer,
   desktop: desktopComputer,
+  "user-device": userDeviceComputer,
   fake: fakeComputer,
 } satisfies Record<string, ComputerProviderDefinition>;
 
@@ -47,3 +49,8 @@ export const knownSandboxKinds = Object.keys(computerProviders) as KnownSandboxK
 export function isKnownSandboxKind(kind: string | null | undefined): kind is KnownSandboxKind {
   return !!kind && Object.hasOwn(computerProviders, kind);
 }
+
+/** The kinds a deployment can choose as its provider. */
+export const deploymentSandboxKinds = knownSandboxKinds.filter(
+  (kind) => (computerProviders[kind] as ComputerProviderDefinition).deployment !== false,
+);

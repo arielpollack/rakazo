@@ -9,7 +9,11 @@ import type {
 } from "@earendil-works/pi-ai";
 import { createProvider, lazyStream } from "@earendil-works/pi-ai";
 import type { PersonalCliAccessCheck } from "../../../cli-models/personal-access.js";
-import { CLAUDE_CODE_PROVIDER_ID } from "./provider-id.js";
+import {
+  CLAUDE_CODE_CATALOG_PROVIDER,
+  CLAUDE_CODE_PROVIDER_ID,
+  CLAUDE_CODE_PROVIDER_NAME,
+} from "./provider-id.js";
 
 export { CLAUDE_CODE_PROVIDER_ID };
 
@@ -24,7 +28,7 @@ interface ClaudeCodeProviderOptions {
 
 /** The CLI takes Anthropic's model ids, so Pi's card for the same id supplies the limits. */
 export function claudeCodeModel(id: string, models: Models): Model<Api> {
-  const card = models.getModel("anthropic", id);
+  const card = models.getModel(CLAUDE_CODE_CATALOG_PROVIDER, id);
   return {
     id,
     name: card?.name ?? id,
@@ -60,7 +64,7 @@ export function claudeCodeProvider(models: Models, options: ClaudeCodeProviderOp
     });
   return createProvider({
     id: CLAUDE_CODE_PROVIDER_ID,
-    name: "Claude Code",
+    name: CLAUDE_CODE_PROVIDER_NAME,
     auth: {
       apiKey: {
         name: "Claude Code sign-in on this server",

@@ -371,6 +371,7 @@ struct WorkspaceCommands: Commands {
   @FocusedValue(\.workspaceActions) private var actions
   #if os(macOS)
     @Environment(\.openWindow) private var openWindow
+    @ObservedObject private var host = MacHostAccess.shared
   #endif
   var body: some Commands {
     CommandGroup(replacing: .newItem) {
@@ -389,6 +390,16 @@ struct WorkspaceCommands: Commands {
       Button("Refresh Workspace") { actions?.refresh() }.keyboardShortcut("r").disabled(actions == nil)
       #if os(iOS)
         Button("Account Settings…") { actions?.panel(.account) }.keyboardShortcut(",")
+      #endif
+      #if os(macOS)
+        if host.available {
+          Divider()
+          if host.enabled {
+            Button("Stop Letting Bots Use This Mac") { host.stop() }
+          } else {
+            Button("Let Bots Use This Mac…") { Task { await host.allow() } }
+          }
+        }
       #endif
       Divider()
       ForEach(Array((actions?.chats ?? []).enumerated()), id: \.element.id) { index, chat in

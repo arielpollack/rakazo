@@ -26,6 +26,7 @@ import { cancelComputerRunWork, providerKeepsHome } from "../computer-idle.js";
 import { computerProviderDescriptor } from "../computer-provider-registry.js";
 import { manageComputerWorkspaceDirectories } from "../computer-workspace.js";
 import { HostComputerSandbox } from "../host/host-computer-sandbox.js";
+import type { UserDeviceGateway } from "../host/user-device-protocol.js";
 import {
   ConfiguredSandbox,
   loadComputerOwnerSettings,
@@ -33,6 +34,7 @@ import {
 } from "./configured-sandbox.js";
 import type { SandboxProviderOptions } from "./sandbox-factory.js";
 import { createSandboxProvider } from "./sandbox-factory.js";
+import { UserDeviceRoutedSandbox, userDeviceHomeOwner } from "./user-device-routed-sandbox.js";
 
 export function sandboxKindForBot(envKind: string, computerHost: string | null | undefined) {
   if (envKind === "docker" && computerHost === "this-mac") return "desktop";
@@ -40,6 +42,20 @@ export function sandboxKindForBot(envKind: string, computerHost: string | null |
 }
 
 export async function createRunSandbox(
+  kind: string,
+  opts: SandboxProviderOptions & {
+    prisma?: PrismaClient;
+    secrets?: Pick<SecretStore, "load" | "onChange">;
+    /** Reaches bots whose computer is their owner's paired device. */
+    userDevices?: UserDeviceGateway;
+  },
+): Promise<SandboxProvider> {
+  const sandbox = await createDeploymentRunSandbox(kind, opts);
+  if (!opts.prisma || !opts.userDevices) return sandbox;
+  return new UserDeviceRoutedSandbox(sandbox, opts.userDevices, userDeviceHomeOwner(opts.prisma));
+}
+
+async function createDeploymentRunSandbox(
   kind: string,
   opts: SandboxProviderOptions & {
     prisma?: PrismaClient;

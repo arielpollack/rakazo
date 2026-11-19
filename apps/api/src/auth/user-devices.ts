@@ -5,8 +5,10 @@ import {
   USER_DEVICE_DISCONNECT_PATH,
   USER_DEVICE_FORWARD_PATH,
   USER_DEVICE_LIMIT,
+  USER_DEVICE_REPLY_PATH,
   userDeviceDisconnectBody,
   userDeviceForwardBody,
+  userDeviceReplyBody,
   validUserDeviceForwardSecret,
 } from "@rakazo/adapters";
 import type { UserDeviceList, UserDevicePairResponse } from "@rakazo/contracts";
@@ -236,8 +238,27 @@ export function mountUserDeviceRoutes(app: Hono, deps: UserDeviceRouteDeps) {
     if (body === null) return c.json({ error: "Request too large" }, 413);
     const input = userDeviceForwardBody.safeParse(parseJson(body));
     if (!input.success) return c.json({ error: "Invalid request" }, 400);
-    const { request, ...route } = input.data;
-    return deps.hub.stream(route, request, c.req.raw.signal);
+    const route = {
+      deviceId: input.data.deviceId,
+      userId: input.data.userId,
+      connectionId: input.data.connectionId,
+    };
+    return "agent" in input.data
+      ? deps.hub.stream(route, { agent: input.data.agent }, c.req.raw.signal, input.data.id)
+      : deps.hub.stream(route, { request: input.data.request }, c.req.raw.signal);
+  });
+
+  app.post(USER_DEVICE_REPLY_PATH, async (c) => {
+    if (!validUserDeviceForwardSecret(deps.forwardSecret, c.req.header("authorization")))
+      return c.json({ error: "Unauthorized" }, 401);
+    const body = await readBoundedBody(c.req.raw, FORWARD_BODY_MAX_BYTES);
+    if (body === null) return c.json({ error: "Request too large" }, 413);
+    const input = userDeviceReplyBody.safeParse(parseJson(body));
+    if (!input.success) return c.json({ error: "Invalid request" }, 400);
+    const { id, callId, value, error, ...route } = input.data;
+    return deps.hub.reply(route, id, callId, { value, error })
+      ? c.body(null, 204)
+      : c.json({ error: "Not connected" }, 409);
   });
 
   app.post(USER_DEVICE_DISCONNECT_PATH, async (c) => {

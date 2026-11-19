@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import type { AgentRuntime } from "@rakazo/adapter-kit";
 import { USER_DEVICE_CONNECT_PATH } from "@rakazo/contracts";
 import type { Deferred } from "@rakazo/core/test-async";
 import { deferred } from "@rakazo/core/test-async";
@@ -75,13 +76,14 @@ describe("user device client", () => {
     await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
   });
 
-  function start(authorize: () => Promise<boolean> = async () => true) {
+  function start(authorize: () => Promise<boolean> = async () => true, agent?: AgentRuntime) {
     client = startUserDeviceClient({
       serverUrl,
       token,
       root,
       onRevoked: revoked,
       authorize,
+      agent,
       retryMs: { min: 20, max: 40 },
     });
   }
@@ -133,6 +135,91 @@ describe("user device client", () => {
       .map((frame) => frame.frame.value);
     expect(values).toContainEqual({ type: "stdout", data: "hi" });
     expect(values.at(-1)).toMatchObject({ type: "exit", code: 0 });
+  });
+
+  it("runs a bot's whole turn here, asking the server for each tool", async () => {
+    const seen: Array<{ prompt: string; model: unknown }> = [];
+    const agent: AgentRuntime = {
+      describe: () => ({ id: "local", capabilities: {} }) as ReturnType<AgentRuntime["describe"]>,
+      abort: async () => undefined,
+      async *run(request) {
+        seen.push({ prompt: request.prompt, model: request.model });
+        const result = await request.executeTool?.("shell", { command: "pwd" }, "exec-1");
+        yield { type: "text", text: `tool said ${JSON.stringify(result)}` };
+      },
+    };
+    start(async () => true, agent);
+    const ws = await connection();
+    const received = frames(ws);
+    ws.send(
+      JSON.stringify({
+        type: "agent",
+        id: "turn",
+        run: {
+          botId: "bot",
+          runId: "run",
+          request: {
+            prompt: "where are you?",
+            model: { provider: "google-vertex", id: "gemini" },
+            callbacks: ["executeTool"],
+          },
+        },
+      }),
+    );
+    await until(() => received.some((frame) => frame.id === "turn" && "call" in frame.frame));
+    const call = received.find((frame) => "call" in frame.frame)!.frame.call as { id: string };
+    expect(call).toMatchObject({
+      name: "executeTool",
+      args: ["shell", { command: "pwd" }, "exec-1", null],
+    });
+    ws.send(JSON.stringify({ type: "reply", id: "turn", callId: call.id, value: "/Users/me" }));
+    await until(() => received.some((frame) => frame.id === "turn" && "done" in frame.frame));
+    expect(seen).toEqual([
+      { prompt: "where are you?", model: { provider: "google-vertex", id: "gemini" } },
+    ]);
+    expect(
+      received.filter((frame) => "value" in frame.frame).map((frame) => frame.frame.value),
+    ).toEqual([{ type: "text", text: 'tool said "/Users/me"' }]);
+  });
+
+  it("reports the model providers it signs in to each time it connects", async () => {
+    client = startUserDeviceClient({
+      serverUrl,
+      token,
+      root,
+      onRevoked: revoked,
+      authorize: async () => true,
+      modelProviders: async () => ["google-vertex", "cli"],
+      retryMs: { min: 20, max: 40 },
+    });
+    const reports: unknown[] = [];
+    wss.on("connection", (ws: WebSocket) =>
+      ws.on("message", (data) => reports.push(JSON.parse(data.toString()))),
+    );
+    const first = await connection();
+    await until(() => reports.length === 1);
+    first.terminate();
+    await connection(1);
+    await until(() => reports.length === 2);
+    expect(reports).toEqual([
+      { type: "models", providers: ["google-vertex", "cli"] },
+      { type: "models", providers: ["google-vertex", "cli"] },
+    ]);
+  });
+
+  it("refuses a bot's turn when this computer does not run bots", async () => {
+    start();
+    const ws = await connection();
+    const received = frames(ws);
+    ws.send(
+      JSON.stringify({
+        type: "agent",
+        id: "turn",
+        run: { botId: "bot", runId: "run", request: { callbacks: [] } },
+      }),
+    );
+    await until(() => received.some((frame) => frame.id === "turn"));
+    expect(received[0]?.frame).toEqual({ error: "This computer does not run bots" });
   });
 
   it("stops a cancelled command without answering for it, and keeps serving", async () => {

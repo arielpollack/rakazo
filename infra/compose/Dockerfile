@@ -14,6 +14,7 @@ RUN corepack install && pnpm --version >/dev/null && chmod -R a+rX "${COREPACK_H
 COPY --chmod=755 patches patches
 COPY --chmod=755 apps/api/package.json apps/api/
 COPY --chmod=755 apps/desktop/package.json apps/desktop/
+COPY --chmod=755 apps/device-runner/package.json apps/device-runner/
 COPY --chmod=755 apps/mobile/package.json apps/mobile/
 COPY --chmod=755 apps/web/package.json apps/web/
 COPY --chmod=755 apps/worker/package.json apps/worker/

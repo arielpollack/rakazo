@@ -114,6 +114,14 @@ describe("resolveDeploymentModel", () => {
     });
   });
 
+  it("allows Vertex on Google Cloud sign-in at startup, before any credentials file is read", () => {
+    const provider = { PI_DEFAULT_PROVIDER: "google-vertex", PI_DEFAULT_CREDENTIALS: "host" };
+    expect(resolveDeploymentModel(provider).configured).toBe(false);
+    expect(
+      resolveDeploymentModel({ ...provider, PI_DEFAULT_MODEL: "gemini-3.5-flash" }),
+    ).toMatchObject({ configured: true, hostCredentials: true, key: undefined });
+  });
+
   it("does not assume host authentication for other providers", () => {
     expect(
       resolveDeploymentModel({

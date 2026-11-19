@@ -3085,6 +3085,36 @@ description: Prepare standup notes
     expect(enqueue).toHaveBeenCalledOnce();
   });
 
+  it("puts a run back to wait, with no timer, while its bot's device is offline", async () => {
+    const run = await deviceBotRun([[], []]);
+
+    await run.executor.continueRun("run-1", "worker-1");
+
+    expect(run.updateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: "running", leaseOwner: "worker-1" }),
+        data: expect.objectContaining({ status: "queued", leaseOwner: null }),
+      }),
+    );
+    expect(run.enqueue).not.toHaveBeenCalled();
+    // Viewers who saw it claimed read it again, now waiting.
+    expect(run.append).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "thread.meta", runId: "run-1" }),
+    );
+  });
+
+  it("starts a waiting run at once when its device connected while it was put back", async () => {
+    const run = await deviceBotRun([[], [{ deviceId: "device-1" }]]);
+
+    await run.executor.continueRun("run-1", "worker-1");
+
+    expect(run.updateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "queued" }) }),
+    );
+    expect(run.enqueue).toHaveBeenCalledOnce();
+    expect(run.append).not.toHaveBeenCalled();
+  });
+
   it("runs a background helper while the bot's computer is switching", async () => {
     const updateMany = vi.fn(async () => ({ count: 1 }));
     const enqueue = vi.fn(async () => undefined);
@@ -4741,3 +4771,45 @@ describe("cross-chat history grant", () => {
     },
   );
 });
+
+/** A chat run of a bot on its owner's device; each check of the device answers in turn. */
+async function deviceBotRun(connections: Array<Array<{ deviceId: string }>>) {
+  const updateMany = vi.fn(async () => ({ count: 1 }));
+  const enqueue = vi.fn(async () => undefined);
+  const prisma = {
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)),
+    $queryRaw: vi.fn(async () => []),
+    space: { findUnique: vi.fn(async () => null) },
+    user: { findUnique: vi.fn(async () => null) },
+    spaceMember: { findUnique: vi.fn(async () => ({ id: "member-1" })) },
+    run: {
+      findUnique: vi.fn(async () => ({
+        id: "run-1",
+        botId: "bot-1",
+        status: "queued",
+        trigger: "user",
+        checkpoint: null,
+        leaseFence: 0,
+      })),
+      findUniqueOrThrow: vi.fn(async () => ({ status: "leased", startedAt: null })),
+      updateMany,
+    },
+    bot: {
+      findUniqueOrThrow: vi.fn(async () => ({
+        computerId: "computer-1",
+        computerSwitching: false,
+        computer: { scope: "dedicated", deviceId: "device-1" },
+      })),
+    },
+    userDeviceConnection: {
+      findMany: vi.fn(async () => connections.shift() ?? []),
+    },
+  } as unknown as PrismaClient;
+  const append = vi.fn(async () => ({ seq: 1 }));
+  const executor = createRunExecutor({
+    prisma,
+    jobs: { enqueue },
+    events: { append },
+  } as unknown as Parameters<typeof createRunExecutor>[0]);
+  return { executor, updateMany, enqueue, append };
+}

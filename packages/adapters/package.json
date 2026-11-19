@@ -7,6 +7,7 @@
     ".": "./src/index.ts",
     "./agent-desktop-host-screen": "./src/computers/screens/agent-desktop-host-screen.ts",
     "./cua-host-screen": "./src/computers/screens/cua-host-screen.ts",
+    "./device-agent-runtime": "./src/runtime/device/device-agent-runtime.ts",
     "./host-computer-server": "./src/computers/host/host-computer-server.ts",
     "./host-screen": "./src/computers/screens/host-screen.ts",
     "./meeting-media": "./src/meetings/meeting-media-grant.ts",

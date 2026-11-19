@@ -111,7 +111,8 @@ struct Conversation: View {
                   }
                 }
                 ChatActivityRows(
-                  turns: feed.turns, chat: chat, bots: store.navigation?.current.bots ?? [])
+                  turns: feed.turns, chat: chat, bots: store.navigation?.current.bots ?? [],
+                  waiting: store.device(of: chat).flatMap { $0.connected ? nil : "Waiting for \($0.name)" })
                 if let failure = feed.runFailure {
                   Problem(text: failure).frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -227,6 +228,12 @@ struct Conversation: View {
         })
     }
   }
+  private var subtitle: String {
+    if let device = store.device(of: chat) {
+      return "\(device.name) · \(device.connected ? "Online" : "Offline")"
+    }
+    return chat.isGroup ? "Group chat" : "Bot"
+  }
   private var profileButton: some View {
     #if os(macOS)
       let avatarSize: CGFloat = 28
@@ -245,14 +252,13 @@ struct Conversation: View {
         VStack(alignment: compact ? .center : .leading, spacing: 1) {
           Text(chat.name).font(.headline).lineLimit(1)
           if !typeSize.isAccessibilitySize {
-            Text(chat.isGroup ? "Group chat" : "Bot").font(
-              .caption
-            ).foregroundStyle(.secondary).lineLimit(1)
+            Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
           }
         }
       }.padding(.horizontal, Layout.Space.tight).frame(minHeight: hitHeight)
         .contentShape(Capsule())
     }.buttonStyle(.plain).accessibilityLabel("Open profile for \(chat.name)")
+      .accessibilityValue(subtitle)
       .accessibilityIdentifier("profile").help("Open conversation profile")
   }
   private func composer(_ colors: OutgoingColors) -> some View {
@@ -652,7 +658,7 @@ struct ConsentView: View {
   let allow: () -> Void
   var body: some View {
     NavigationStack {
-      List {
+      Form {
         Section("These providers may receive data for this action") {
           ForEach(status.unapproved) { item in
             VStack(alignment: .leading, spacing: 6) {
@@ -661,11 +667,17 @@ struct ConsentView: View {
             }
           }
         }
-        Section {
-          Button("Allow and continue", action: allow).accessibilityIdentifier("allowConsent")
-          Button("Not now", role: .cancel, action: cancel)
+      }.formStyle(.grouped).navigationTitle("Review AI data sharing").inlineMobileTitle()
+        .toolbar {
+          ToolbarItem(placement: .cancellationAction) { Button("Not now", action: cancel) }
+          ToolbarItem(placement: .confirmationAction) {
+            Button("Allow and continue", action: allow).accessibilityIdentifier("allowConsent")
+          }
         }
-      }.navigationTitle("Review AI data sharing")
     }
+    // A Mac sheet takes its content's height, and a form alone has almost none.
+    #if os(macOS)
+      .frame(minWidth: 400, idealWidth: 460, minHeight: 240, idealHeight: 320)
+    #endif
   }
 }

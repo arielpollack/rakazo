@@ -300,6 +300,10 @@ export interface SandboxKindCapabilities {
   storedHomeIsBackup: boolean;
   /** The provider can read the disk of a stopped sandbox without starting it. */
   readStoppedFiles?: boolean;
+  /** The workspace lives only on the machine: the server never saves or restores a copy. */
+  homeStaysOnMachine?: boolean;
+  /** It runs as its owner on their own machine, so only the owner's own chats may use it. */
+  ownerRunsOnly?: boolean;
 }
 
 export interface SandboxCapabilities {

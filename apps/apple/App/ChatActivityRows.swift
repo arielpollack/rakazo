@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ChatActivityRows: View {
   let turns: [LiveBotTurn], chat: Chat, bots: [Chat]
+  /// What a queued turn waits for, such as the computer it runs on being off.
+  var waiting: String? = nil
   @Environment(\.accessibilityReduceMotion) private var reducedMotion
   @Environment(\.scenePhase) private var phase
 
@@ -42,11 +44,12 @@ struct ChatActivityRows: View {
 
   @ViewBuilder private func mark(_ turn: LiveBotTurn) -> some View {
     if let bot = bot(for: turn) {
+      let caption = turn.status == "queued" ? waiting ?? turn.caption : turn.caption
       HStack(spacing: Layout.Space.small) {
         Avatar(chat: bot, size: 28, pose: turn.pose, activityMark: true).id(bot.id)
-        Text(turn.caption).font(.subheadline).foregroundStyle(.secondary)
+        Text(caption).font(.subheadline).foregroundStyle(.secondary)
       }.padding(.vertical, Layout.Space.tight).frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .contain).accessibilityLabel("\(bot.name), \(turn.caption)")
+        .accessibilityElement(children: .contain).accessibilityLabel("\(bot.name), \(caption)")
     }
   }
 }

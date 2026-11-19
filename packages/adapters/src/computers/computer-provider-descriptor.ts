@@ -115,6 +115,8 @@ export interface ComputerProviderDefinition {
   };
   /** Whether the environment leaves the provider unable to run beyond a missing required option. */
   unavailable?(source: NodeJS.ProcessEnv): boolean;
+  /** False for a kind the run sandbox wires itself, which a deployment cannot choose. */
+  deployment?: false;
   /** Loads the provider's module only when it is used. */
   create(options: SandboxProviderOptions): Promise<SandboxProvider>;
 }

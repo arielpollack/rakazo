@@ -2,16 +2,20 @@ import { BACKGROUND_HELPER_TRIGGER, isTerminal } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { expireComputerExecutionLeases } from "@rakazo/db";
 import { EXECUTION_LEASE_MS } from "../../computers/computer-lifecycle.js";
+import { onlineUserDevices } from "../../computers/host/user-device-gateway.js";
 
 type RecoveryRun = {
   id: string;
   botId: string;
+  status: string;
   trigger: string;
-  bot: { computerId: string | null };
+  bot: { computerId: string | null; computer?: { deviceId: string | null } | null };
 };
 
 /**
- * Leave resource waits untouched so recovery preserves their age and execution history.
+ * Leave resource waits untouched so recovery preserves their age and execution history. Each
+ * blocked run maps to the run holding its bot's computer, or to null while the computer is its
+ * owner's device and that device is offline; the device starts it when it connects.
  * A takeover hold whose run ended or was deleted is expired instead: leases have no relation
  * to runs, so nothing else would free the bot's computer before the hold lapses a day later.
  */
@@ -19,7 +23,7 @@ export async function findRunRecoveryBlockers(
   prisma: PrismaClient,
   runs: readonly RecoveryRun[],
   now: Date,
-): Promise<Map<string, string>> {
+): Promise<Map<string, string | null>> {
   const leases = runs.length
     ? await prisma.computerExecutionLease.findMany({
         where: { botId: { in: runs.map((run) => run.botId) }, expiresAt: { gt: now } },
@@ -34,8 +38,17 @@ export async function findRunRecoveryBlockers(
       expiresAt: { gt: now },
     });
   }
-  const blockers = new Map<string, string>();
+  const waitingDevices = runs.flatMap((run) =>
+    run.status === "queued" && run.bot.computer?.deviceId ? [run.bot.computer.deviceId] : [],
+  );
+  const online = await onlineUserDevices(prisma, waitingDevices);
+  const blockers = new Map<string, string | null>();
   for (const run of runs) {
+    const deviceId = run.status === "queued" ? run.bot.computer?.deviceId : null;
+    if (deviceId && !online.has(deviceId)) {
+      blockers.set(run.id, null);
+      continue;
+    }
     // Ordinary runs claim the computer only on first use. Only a held takeover
     // still needs the dispatcher to arrange a release before a new run starts.
     if (run.trigger === BACKGROUND_HELPER_TRIGGER) continue;

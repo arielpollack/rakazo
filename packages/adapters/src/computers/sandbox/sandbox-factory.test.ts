@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { NO_SANDBOX_MESSAGE } from "../../providers/computer/none/none-sandbox.js";
+import { deploymentSandboxKinds } from "../computer-providers.js";
 import { createSandboxProvider } from "./sandbox-factory.js";
-import { knownSandboxKinds } from "./sandbox-kind-capabilities.js";
 
 const ctx = {
   operationId: "op",
@@ -154,8 +154,9 @@ describe("createSandboxProvider", () => {
   });
 
   it("accepts only sandbox kinds, including none", async () => {
-    expect(knownSandboxKinds).toContain("none");
-    for (const kind of knownSandboxKinds) {
+    expect(deploymentSandboxKinds).toContain("none");
+    expect(deploymentSandboxKinds).not.toContain("user-device");
+    for (const kind of deploymentSandboxKinds) {
       await expect(createSandboxProvider(kind, {})).resolves.toBeDefined();
     }
     await expect(createSandboxProvider("not-a-provider", {})).rejects.toThrow(

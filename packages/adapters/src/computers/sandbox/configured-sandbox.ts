@@ -26,6 +26,7 @@ import {
 import { manageComputerWorkspaceDirectories } from "../computer-workspace.js";
 import { sandboxNotFoundError } from "./sandbox-errors.js";
 import { createSandboxProvider } from "./sandbox-factory.js";
+import { routedSandboxInner } from "./user-device-routed-sandbox.js";
 
 export const COMPUTER_PROVIDER_SECRET_KIND = "computer-provider";
 /** Record id binding the deployment's encrypted computer settings to its settings row. */
@@ -166,7 +167,8 @@ export async function loadComputerOwnerSettings(
     : null;
 }
 export async function refreshComputerProvider(sandbox: SandboxProvider) {
-  if (sandbox instanceof ConfiguredSandbox) await sandbox.refresh();
+  const configured = routedSandboxInner(sandbox);
+  if (configured instanceof ConfiguredSandbox) await configured.refresh();
 }
 
 /** Resolve settings per operation; retain only the adapter for each current ciphertext. */

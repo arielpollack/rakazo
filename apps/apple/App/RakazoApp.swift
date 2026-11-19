@@ -1,8 +1,15 @@
 import SwiftUI
 
 @main struct RakazoApp: App {
-  @StateObject private var session = AppSession()
+  @StateObject private var session: AppSession
   @AppStorage("appearance") private var appearance = "System"
+  init() {
+    let session = AppSession()
+    _session = StateObject(wrappedValue: session)
+    #if os(macOS)
+      MacHostAccess.shared.follow(session)
+    #endif
+  }
   private var colorScheme: ColorScheme? {
     appearance == "Light" ? .light : appearance == "Dark" ? .dark : nil
   }

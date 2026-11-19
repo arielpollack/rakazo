@@ -27,6 +27,7 @@ import { cliModelRuntime } from "../../cli-models/runtime.js";
 import { reconcileCloudAgents } from "../../cloud-agents/cloud-agent-service.js";
 import { createIdleComputerSweeper } from "../../computers/computer-idle.js";
 import { reconcileComputerUpdates } from "../../computers/computer-update.js";
+import type { UserDeviceAgentLink } from "../../computers/host/user-device-protocol.js";
 import { createConnectorStack } from "../../integrations/connector-registry.js";
 import type { RemoteConnectorDependencies } from "../../integrations/installed-connectors.js";
 import { InstalledConnectorProvider } from "../../integrations/installed-connectors.js";
@@ -59,6 +60,10 @@ import {
   pipedreamConfigFromEnv,
 } from "../../providers/integration/pipedream/pipedream-connector.js";
 import { createStrategicInitiativeReconciler } from "../../routines/strategic-initiative.js";
+import {
+  UserDeviceAgentRuntime,
+  userDeviceAgentPlacement,
+} from "../../runtime/device/user-device-runtime.js";
 import { localModelsApiKey } from "../../runtime/pi/models/pi-local-provider-id.js";
 import type { SecretCleanupDeps } from "../../secrets/secret-cleanup.js";
 import { workspaceSaveLimits } from "../../storage/workspace-save-policy.js";
@@ -244,6 +249,8 @@ export function createRunRuntime(
     meetingCalendarSync?: (job: BackgroundJobPayloads["meeting.calendar-sync"]) => Promise<void>;
     meetingWork?: (job: BackgroundJobPayloads["meeting.work"]) => Promise<unknown>;
     lifecycleEmail?: (job: BackgroundJobPayloads["email.lifecycle"]) => Promise<void>;
+    /** Runs the turns of bots that live on their owner's computer there. */
+    userDeviceAgents?: UserDeviceAgentLink;
   },
 ) {
   const {
@@ -252,9 +259,17 @@ export function createRunRuntime(
     lifecycleEmail,
     meetingWork,
     meetingCalendarSync,
+    userDeviceAgents,
     ...executorDeps
   } = deps;
-  const runtime = cliModelRuntime(env, deps.runtime, deps);
+  const serverRuntime = cliModelRuntime(env, deps.runtime, deps);
+  const runtime = userDeviceAgents
+    ? new UserDeviceAgentRuntime(
+        serverRuntime,
+        userDeviceAgents,
+        userDeviceAgentPlacement(deps.prisma),
+      )
+    : serverRuntime;
   const messagingDelivery = messaging
     ? new MessagingDelivery({
         prisma: deps.prisma,

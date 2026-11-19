@@ -1,6 +1,6 @@
 # Rakazo Native
 
-A SwiftUI client for an existing Rakazo server. One multiplatform target builds **directly for macOS** and for iPhone/iPad; it does not use Mac Catalyst. The Mac preview has its own app container and Keychain identity (`dev.rakazo.nativeclient.macpreview`). It does not replace the original Rakazo or the previous Catalyst app, import their accounts, or run a server or model on your device. The iOS app keeps its existing identity (`dev.rakazo.nativeclient`).
+A SwiftUI client for an existing Rakazo server. One multiplatform target builds **directly for macOS** and for iPhone/iPad; it does not use Mac Catalyst. The Mac preview has its own bundle and Keychain identity (`dev.rakazo.nativeclient.macpreview`) and is not sandboxed, so bots you allow can run commands on it as you. It does not replace the original Rakazo or the previous Catalyst app, import their accounts, or run a server on your device. The iOS app keeps its existing identity (`dev.rakazo.nativeclient`).
 
 ## Try it
 
@@ -29,9 +29,9 @@ The catalog is shipped in the app; the sample never contacts a provider, install
 
 | Surface | What you can do |
 | --- | --- |
-| Workspace | Switch spaces, create bots, groups and private spaces; search chats and message history, read a match in context, and jump back to the live conversation; pin or mark a conversation unread. |
+| Workspace | Switch spaces, create bots, groups and private spaces; search chats and message history, read a match in context, and jump back to the live conversation; pin or mark a conversation unread. On Mac, **Workspace → Let Bots Use This Mac…** pairs this Mac so a bot can run its commands and files here; the same menu turns it off. |
 | Conversation | Send, react, reply or quote a passage, mark unread, watch the active bot work and write, answer a question, stop a run, and transfer attachments. Tool progress is transient; actionable cards remain. AI-recipient disclosures appear before sending when required. |
-| Inspector | Edit bot profiles and group membership, inspect computer status, and list pages and routines. Create a paused daily routine, edit its prompt, activate or pause it, read run history, or delete it. |
+| Inspector | Edit bot profiles and group membership, inspect computer status, choose whether a bot runs on the server or a paired Mac, and list pages and routines. Create a paused daily routine, edit its prompt, activate or pause it, read run history, or delete it. |
 | Activity and settings | Open the chat behind a run. Review a connector, authorize in the provider’s browser, check its status, inspect tools, rename or revoke an account. Change appearance and sign out. |
 
 This is **not full Rakazo feature parity**. [The parity ledger](PARITY.md) separates native interactions, web handoffs, unimplemented surfaces and verification. Web handoffs require the deployment’s web UI and a separate browser session; they do not embed React or a WebView. The sample does not perform real integrations or retain uploaded file bytes. Attachment reads are capped at 24 MB and also respect server upload limits.
@@ -70,6 +70,10 @@ The compatibility target is [Rakazo v0.12.0](https://github.com/elie222/rakazo/t
 # Tablet layout, without a server.
 xcodebuild -scheme RakazoNative -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M5)' \
   -only-testing:RakazoUITests/TabletTests -parallel-testing-enabled NO test
+
+# Bots on this Mac: the app starts the device runner built in this checkout with the Node on
+# the login shell's PATH. Build it before running the Mac app.
+pnpm --filter @rakazo/device-runner build
 
 # Native transport and byte-for-byte attachment round trip, without a simulator.
 mkdir -p .build

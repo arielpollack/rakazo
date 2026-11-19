@@ -28,6 +28,17 @@ export const InstructionVersionSchema = z.object({
   createdAt: z.string(),
 });
 
+/** A model a bot on its owner's computer can use, signed in on that computer. */
+export const ComputerModelChoiceSchema = z.object({
+  provider: z.string(),
+  providerName: z.string(),
+  id: z.string(),
+  label: z.string(),
+  recommended: z.boolean(),
+  thinkingLevels: z.array(z.string()),
+});
+export type ComputerModelChoice = z.infer<typeof ComputerModelChoiceSchema>;
+
 export const BotSchema = z.object({
   meetingsEnabled: z.boolean().optional(),
   id: Id,
@@ -55,6 +66,8 @@ export const BotSchema = z.object({
   threadStatus: z.string().optional(),
   runErrorId: Id.nullable().default(null),
   computerMode: ComputerModeSchema,
+  /** The owner's paired computer this bot runs on; null when it runs on the server. */
+  computerDeviceId: Id.nullable().default(null),
   updatedAt: z.string(),
   createdAt: z.string(),
   voiceId: z.string().nullable(),

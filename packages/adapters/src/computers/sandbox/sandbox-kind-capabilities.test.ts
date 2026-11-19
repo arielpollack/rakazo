@@ -41,7 +41,12 @@ const EXPECTED: Record<KnownSandboxKind, Row> = {
   "local-vm": [true, true, false, false, DEFAULT_SCREEN, "never", true, false],
   wuying: [false, false, true, false, DEFAULT_SCREEN, "never", false, true],
   desktop: [false, false, true, true, DEFAULT_SCREEN, "never", false, true],
+  "user-device": [false, false, true, true, DEFAULT_SCREEN, "never", false, false],
   fake: [true, true, false, false, DEFAULT_SCREEN, "never", false, false],
+};
+/** Flags only some kinds declare, beyond the row. */
+const EXTRA: Partial<Record<KnownSandboxKind, Partial<SandboxKindCapabilities>>> = {
+  "user-device": { homeStaysOnMachine: true, ownerRunsOnly: true },
 };
 const UNDECLARED: Row = [false, true, false, false, DEFAULT_SCREEN, "never", false, false];
 
@@ -75,7 +80,10 @@ describe("sandbox kind capabilities", () => {
   });
 
   it.each(knownSandboxKinds)("%s declares the pinned values", (kind) => {
-    expect(sandboxKindCapabilities(kind)).toEqual(capabilities(EXPECTED[kind]));
+    expect(sandboxKindCapabilities(kind)).toEqual({
+      ...capabilities(EXPECTED[kind]),
+      ...EXTRA[kind],
+    });
   });
 
   it.each(["unknown", "", null, undefined])("reads undeclared kind %j as before", (kind) => {
@@ -94,6 +102,9 @@ describe("sandbox kind capabilities", () => {
       "docker",
       "wuying",
     ]);
-    expect(sandboxKindsWhere((entry) => entry.runsOnUserMachine)).toEqual(["desktop"]);
+    expect(sandboxKindsWhere((entry) => entry.runsOnUserMachine)).toEqual([
+      "desktop",
+      "user-device",
+    ]);
   });
 });

@@ -24,7 +24,10 @@ import {
   hostComputerFileTooLargeLimit,
 } from "./host-computer-protocol.js";
 
-/** Authenticated native host transport. Commands are never retried after a lost response. */
+/**
+ * Authenticated native host transport. Commands are never retried after a lost response.
+ * A subclass can carry the same requests over another transport by overriding `request`.
+ */
 export class HostComputerSandbox implements SandboxProvider {
   constructor(
     private readonly url: string,
@@ -34,7 +37,10 @@ export class HostComputerSandbox implements SandboxProvider {
     return describeDesktopSandbox();
   }
 
-  private async *request<T>(input: HostComputerRequest, context: AdapterContext): AsyncIterable<T> {
+  protected async *request<T>(
+    input: HostComputerRequest,
+    context: AdapterContext,
+  ): AsyncIterable<T> {
     if (!this.url || !this.token)
       throw new Error("Local computer access requires the desktop app. Enable it in the app menu.");
     const body = JSON.stringify({ ...input, runId: context.runId });

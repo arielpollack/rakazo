@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type {
   Actor,
   Bot,
@@ -91,7 +92,7 @@ function mapBot(
     createdAt: Date;
     updatedAt: Date;
     thread: { id: string; reads: Array<{ unread: boolean; snoozedUntil: Date | null }> } | null;
-    computer: { scope: string } | null;
+    computer: { scope: string; deviceId?: string | null } | null;
     voiceId?: string | null;
     autoSpeak?: boolean;
     modelProvider?: string | null;
@@ -139,6 +140,7 @@ function mapBot(
     status,
     runErrorId,
     computerMode: bot.computer ? parseComputerMode(bot.computer.scope) : "team",
+    computerDeviceId: bot.computer?.deviceId ?? null,
     createdAt: bot.createdAt.toISOString(),
     updatedAt: updatedAt.toISOString(),
     voiceId: bot.voiceId ?? null,
@@ -364,7 +366,7 @@ export function createRepos(
           include: {
             thread: { include: { reads: readStateFor(actor.userId) } },
             runs: activeRunSelection,
-            computer: { select: { scope: true } },
+            computer: { select: { scope: true, deviceId: true } },
           },
           orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }],
         }),
@@ -665,13 +667,19 @@ export function createRepos(
       });
     },
 
-    async setBotComputer(actor: Actor, botId: string, mode: ComputerMode): Promise<Bot> {
+    /** `kind` names the provider for a computer this creates; it defaults to the current one's. */
+    async setBotComputer(
+      actor: Actor,
+      botId: string,
+      mode: ComputerMode,
+      kind?: string,
+    ): Promise<Bot> {
       const bot = await prisma.bot.findFirst({
         where: { id: botId, spaceId: actor.spaceId },
         include: { computer: true },
       });
       if (!bot?.computer) throw new IsolationError();
-      const kind = bot.computer.kind;
+      kind ??= bot.computer.kind;
       // Keep ensure + bot link in one transaction so a capped quota lock covers
       // both steps (a computer row alone does not count until a live bot refs it).
       // A private computer stays with the bot's creator, whoever in the space changes the mode;
@@ -695,6 +703,45 @@ export function createRepos(
           });
         }),
       );
+      return mapBot(updated);
+    },
+
+    /**
+     * Runs the bot on its owner's paired device. Each bot and device pair keeps one computer,
+     * whose home lives only on that device, so moving back to it finds the same files there.
+     */
+    async setBotComputerDevice(
+      actor: Actor,
+      botId: string,
+      device: { id: string; kind: string },
+    ): Promise<Bot> {
+      const bot = await prisma.bot.findFirst({
+        where: { id: botId, spaceId: actor.spaceId },
+        select: { id: true, userId: true },
+      });
+      if (!bot) throw new IsolationError();
+      const scopeKey = `device:${botId}:${device.id}`;
+      const homeKey = `device-${createHash("sha256").update(`${botId}:${device.id}`).digest("hex").slice(0, 32)}`;
+      const updated = await prisma.$transaction(async (tx) => {
+        const computer = await tx.computer.upsert({
+          where: { scopeKey },
+          create: {
+            spaceId: actor.spaceId,
+            userId: bot.userId,
+            scope: "dedicated",
+            scopeKey,
+            homeKey,
+            kind: device.kind,
+            deviceId: device.id,
+          },
+          update: { deviceId: device.id },
+        });
+        return tx.bot.update({
+          where: { id: botId },
+          data: { computerId: computer.id },
+          include: { thread: { include: { reads: readStateFor(actor.userId) } }, computer: true },
+        });
+      });
       return mapBot(updated);
     },
   };

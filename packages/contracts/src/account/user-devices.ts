@@ -27,6 +27,8 @@ export const userDeviceListSchema = z.object({
       deviceId: z.string(),
       name: z.string(),
       connected: z.boolean(),
+      /** The model providers it signs in to by itself, as it last reported. */
+      modelProviders: z.array(z.string()).default([]),
     }),
   ),
 });

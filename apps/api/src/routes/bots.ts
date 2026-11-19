@@ -3,6 +3,7 @@ import {
   archiveBot,
   checkpointAndStopComputer,
   defaultVaultItemTitle,
+  deviceBotModels,
   endTeachingWithLease,
   forgetBotSecret,
   forgetPageShareSecrets,
@@ -27,6 +28,7 @@ import {
   VaultItemRefusedError,
   VaultRetryError,
   validateBotModelChange,
+  validateDeviceModelChange,
   wakeRun,
 } from "@rakazo/adapters";
 import type {
@@ -71,6 +73,7 @@ import {
   previewAgentImport,
 } from "../bots/agent-import.js";
 import { deleteAgentSecret, listAgentSecrets, putAgentSecret } from "../bots/agent-secrets.js";
+import { setBotComputerDevice } from "../bots/bot-computer-device.js";
 import { loadBotForRemoval } from "../bots/bot-removal.js";
 import { createBotFromTemplate, listBotTemplates } from "../bots/bot-templates.js";
 import { botIntroPrompt } from "../bots/hidden-turns.prompt.js";
@@ -433,15 +436,22 @@ export function botsRoutes(ctx: RouterContext) {
           });
           if (!section) throw new IsolationError();
         }
-        const modelChange = await validateBotModelChange(botModelValidation(context.actor), {
-          userId: context.actor.userId,
-          spaceId: context.actor.spaceId,
+        const nextModel = {
           provider:
             input.modelProvider !== undefined ? input.modelProvider : existing.modelProvider,
           model: input.modelId !== undefined ? input.modelId : existing.modelId,
           thinkingLevel: input.thinkingLevel,
           current: { provider: existing.modelProvider, model: existing.modelId },
-        });
+        };
+        // A bot on its owner's computer calls its model with that computer's sign-ins.
+        const deviceId = existing.computer?.deviceId;
+        const modelChange = deviceId
+          ? await validateDeviceModelChange(deps.prisma, deviceId, nextModel)
+          : await validateBotModelChange(botModelValidation(context.actor), {
+              userId: context.actor.userId,
+              spaceId: context.actor.spaceId,
+              ...nextModel,
+            });
         if (!modelChange.ok) throw new ORPCError("BAD_REQUEST", { message: modelChange.error });
         const thinkingLevel = input.thinkingLevel;
         if (!existing.thread) throw new IsolationError();
@@ -603,6 +613,19 @@ export function botsRoutes(ctx: RouterContext) {
             data: { computerSwitching: false },
           });
         }
+      }),
+      setComputerDevice: authed.bots.setComputerDevice.handler(({ context, input }) =>
+        setBotComputerDevice(ctx, context.actor, input),
+      ),
+      computerModels: authed.bots.computerModels.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const deviceId = bot.computer?.deviceId;
+        if (!deviceId) return { models: [], current: null };
+        const { models, current } = await deviceBotModels(deps.prisma, deviceId, {
+          provider: bot.modelProvider,
+          id: bot.modelId,
+        });
+        return { models, current: current ? { provider: current.provider, id: current.id } : null };
       }),
       archive: authed.bots.archive.handler(async ({ context, input }) => {
         const bot = await repos.getBot(context.actor, input.botId, { includeArchived: true });

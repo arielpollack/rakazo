@@ -16,6 +16,9 @@ struct Chat: Codable, Identifiable, Hashable {
   var sectionId: String?
   var members: [Member]?
   var computerMode: String?
+  /// The paired computer the bot runs on; nil runs it on the server.
+  var computerDeviceId: String?
+  var modelProvider: String?
   var modelId: String?
   var isGroup: Bool { members != nil }
   var target: [String: Any] { [isGroup ? "groupId" : "botId": id] }

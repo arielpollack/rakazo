@@ -155,7 +155,15 @@ describe("createJobReconciler", () => {
     const scheduledFor = new Date(Date.now() + 30_000);
     const controlExpiresAt = new Date(Date.now() + 15_000);
     const prisma = fakePrisma(
-      [{ id: "run-1", status: "queued", updatedAt: new Date() }],
+      [
+        {
+          id: "run-1",
+          status: "queued",
+          botId: "bot-1",
+          bot: { computerId: null },
+          updatedAt: new Date(),
+        },
+      ],
       [{ id: "routine-1", nextRunAt: scheduledFor }],
       [
         {
@@ -329,8 +337,20 @@ describe("createJobReconciler", () => {
 
   it("replaces any lock for an expired lease but only an old lock for a queued run", async () => {
     const prisma = fakePrisma([
-      { id: "run-queued", status: "queued", updatedAt: new Date() },
-      { id: "run-expired", status: "running", updatedAt: new Date() },
+      {
+        id: "run-queued",
+        status: "queued",
+        botId: "bot-1",
+        bot: { computerId: null },
+        updatedAt: new Date(),
+      },
+      {
+        id: "run-expired",
+        status: "running",
+        botId: "bot-1",
+        bot: { computerId: null },
+        updatedAt: new Date(),
+      },
     ]);
     const { jobs, enqueue } = publisher();
     const before = Date.now();

@@ -40,6 +40,11 @@ import { paymentWalletConnected } from "../../payments/payment-wallets.js";
 import { desktopGuardApplies } from "../../providers/computer/desktop/desktop-command-guard.js";
 import { backOffRoutineAfterAccountError } from "../../routines/routine-backoff.js";
 import { filterStrategicInitiativeTools } from "../../routines/strategic-initiative.js";
+import { deviceBotModels, deviceSignedOutMessage } from "../../runtime/device/device-models.js";
+import {
+  OWNER_ONLY_DEVICE_MESSAGE,
+  ownerChatRun,
+} from "../../runtime/device/user-device-runtime.js";
 import {
   createEarlierFileQueue,
   listCurrentTurnFiles,
@@ -66,6 +71,7 @@ import {
 } from "../tools/run-tool-selection.js";
 import type { UserComputerState } from "../tools/run-tools-user-computer.js";
 import { USER_COMPUTER_SHELL_TOOL, userComputerOwner } from "../tools/run-tools-user-computer.js";
+import type { resolveModelKey } from "../turn/run-model.js";
 import {
   modelCreditBillingEnabled,
   resolvedModelRunFields,
@@ -170,6 +176,48 @@ export async function startTurnModel(
     await failRunBeforeModel(pinnedComputerFailure, true);
     return;
   }
+  // A bot on its owner's computer calls its model from there, signed in as that computer is. The
+  // server sends only the model: the bot's own if the computer has it, else the computer's default.
+  if (bot.computer?.deviceId) {
+    const { deviceName, current } = await deviceBotModels(deps.prisma, bot.computer.deviceId, {
+      provider: modelChoice.modelProvider,
+      id: modelChoice.modelId,
+    });
+    if (!current) {
+      await failRunBeforeModel(deviceSignedOutMessage(deviceName), true);
+      return;
+    }
+    const { provider, id } = current;
+    const own = provider === modelChoice.modelProvider && id === modelChoice.modelId;
+    if (!run.modelPinned)
+      await deps.prisma.run.updateMany({
+        where: { id: runId, status: "running", leaseOwner: workerId, leaseFence: fence },
+        data: { modelProvider: provider, modelId: id },
+      });
+    const deviceResolved: Awaited<ReturnType<typeof resolveModelKey>> = {
+      apiKey: undefined,
+      callObserver: undefined,
+      connectionId: undefined,
+      redact: [],
+    };
+    return {
+      scripted: deps.runtime.describe().capabilities.scripted,
+      backups: runModelBackups(
+        deps,
+        run,
+        { settings, deployment: runDeployment },
+        deps.runtime.describe().capabilities.scripted,
+        (values: string[]) => runSecrets.push(...values),
+      ),
+      runModelProvider: provider,
+      runModelId: id,
+      credential: null,
+      thinkingLevel: (own ? modelChoice.thinkingLevel : null) as
+        | AgentRunRequest["model"]["thinkingLevel"]
+        | null,
+      resolved: deviceResolved,
+    };
+  }
   if (pinError) {
     await failRunBeforeModel(pinError, pinError === PINNED_PROVIDER_NOT_CONNECTED);
     return;
@@ -258,6 +306,11 @@ export async function prepareRunComputer(
   const earlierFiles = createEarlierFileQueue();
   const runComputer = lazyRunComputer(
     async () => {
+      if (
+        sandboxKindCapabilities(storedComputer.kind).ownerRunsOnly &&
+        !ownerChatRun(run, bot.userId)
+      )
+        throw new Error(OWNER_ONLY_DEVICE_MESSAGE);
       if (!hold.computerLease) {
         hold.computerLease = await waitForRunComputerLease(
           deps.prisma,

@@ -87,6 +87,7 @@ import {
   userDeviceInternalAddress,
   verifyModelServesAgents,
   WorkActivities,
+  wakeRunsWaitingForDevice,
   withHostComputerScreen,
   withSecretPersistence,
   withSecretWriteAhead,
@@ -123,6 +124,7 @@ import {
   joinedOrganizationIds,
   observeThreadChanges,
   parsePositiveInteger,
+  publishRosterChange,
   pushSessionExpiresAt,
   requireMembership,
   rowSecurityWarning,
@@ -407,6 +409,26 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     prisma,
     deploymentLabs: env.deploymentLabs,
   });
+  const userDeviceSecret = userDeviceForwardSecret(env.encryptionKey);
+  const userDeviceHub = env.userDevicesEnabled
+    ? new UserDeviceHub({
+        prisma,
+        address: userDeviceInternalAddress(env.apiHost, env.port),
+        // Apps show whether a bot's computer is online, and its waiting messages start.
+        onPresence: (device, online) => {
+          void publishRosterChange(realtime, { userIds: [device.userId] });
+          if (online)
+            void bestEffort(
+              "start runs waiting for a computer",
+              wakeRunsWaitingForDevice({ prisma, jobs }, device.id),
+            );
+        },
+        onModels: (device) => void publishRosterChange(realtime, { userIds: [device.userId] }),
+      })
+    : undefined;
+  const userDevices = userDeviceHub
+    ? new UserDevices({ prisma, forwardSecret: userDeviceSecret, hub: userDeviceHub })
+    : undefined;
   const sandbox: SandboxProvider =
     sandboxOverride ??
     (await createRunSandbox(env.sandboxProvider, {
@@ -417,6 +439,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       prisma,
       secrets,
       unreferencedMachines: machineCleanupRecords(jobs),
+      userDevices: userDevicesOverride ?? userDevices,
     }));
   const memoryProviders = new SpaceMemoryProviderResolver(prisma, secrets);
   const oauthLogins = new PiOAuthLogins<ModelCredential>(undefined, { prisma, secrets }, (ended) =>
@@ -540,13 +563,6 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     });
   const activityPush = await createApnsActivityProvider(env.apnsVoip);
   if (activityPush) workActivities = new WorkActivities(prisma, env.encryptionKey, activityPush);
-  const userDeviceSecret = userDeviceForwardSecret(env.encryptionKey);
-  const userDeviceHub = env.userDevicesEnabled
-    ? new UserDeviceHub({ prisma, address: userDeviceInternalAddress(env.apiHost, env.port) })
-    : undefined;
-  const userDevices = userDeviceHub
-    ? new UserDevices({ prisma, forwardSecret: userDeviceSecret, hub: userDeviceHub })
-    : undefined;
   const deviceSessions = {
     prisma,
     devices: userDevices ?? new UserDevices({ prisma, forwardSecret: userDeviceSecret }),
@@ -725,6 +741,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       contextStrategy,
       prisma,
       runtime: baseRuntime,
+      userDeviceAgents: userDevices,
       codexCatalog,
       sandbox,
       memory,

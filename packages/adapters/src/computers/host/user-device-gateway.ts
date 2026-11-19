@@ -6,7 +6,7 @@ import type { UserDeviceSummary } from "@rakazo/contracts";
 import { USER_DEVICE_CONNECT_PATH } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import { recordSecurityEvent, runAsSystem } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+import { bestEffort, getLogger } from "@rakazo/logging";
 import { WebSocketServer } from "ws";
 import { z } from "zod";
 import type { HostComputerFrame, HostComputerRequest } from "./host-computer-protocol.js";
@@ -17,11 +17,17 @@ import {
 } from "./host-computer-protocol.js";
 import type {
   UserDevice,
+  UserDeviceAgentCall,
+  UserDeviceAgentLink,
+  UserDeviceAgentRun,
+  UserDeviceAgentSession,
   UserDeviceGateway,
   UserDeviceRevokeReason,
 } from "./user-device-protocol.js";
 import {
   USER_DEVICE_REVOKED_HEADER,
+  userDeviceAgentCall,
+  userDeviceAgentRun,
   userDeviceClientMessage,
   userDeviceRevokeReason,
 } from "./user-device-protocol.js";
@@ -29,6 +35,7 @@ import {
 /** Internal API endpoints other processes forward to. Not under /api, so the public proxy never routes them. */
 export const USER_DEVICE_FORWARD_PATH = "/internal/user-devices/request";
 export const USER_DEVICE_DISCONNECT_PATH = "/internal/user-devices/disconnect";
+export const USER_DEVICE_REPLY_PATH = "/internal/user-devices/reply";
 export const USER_DEVICE_OFFLINE_MESSAGE =
   "Your computer is not connected. Open the Rakazo desktop app.";
 const DISCONNECTED_MESSAGE = "Your computer disconnected. Check the result before retrying.";
@@ -44,6 +51,25 @@ export class UserDeviceOfflineError extends Error {
     super(message, options);
     this.name = "UserDeviceOfflineError";
   }
+}
+
+/** Which of these devices are connected now, by the same rule requests are routed by. */
+export async function onlineUserDevices(
+  prisma: PrismaClient,
+  deviceIds: readonly string[],
+): Promise<Set<string>> {
+  if (!deviceIds.length) return new Set();
+  const connections = await runAsSystem("check which user devices are online", () =>
+    prisma.userDeviceConnection.findMany({
+      where: {
+        deviceId: { in: [...new Set(deviceIds)] },
+        heartbeatAt: { gt: new Date(Date.now() - STALE_AFTER_MS) },
+        device: { revokedAt: null },
+      },
+      select: { deviceId: true },
+    }),
+  );
+  return new Set(connections.map((connection) => connection.deviceId));
 }
 
 export function createUserDeviceToken(): string {
@@ -209,6 +235,13 @@ export class UserDeviceHub {
       prisma: PrismaClient;
       address: string;
       pingIntervalMs?: number;
+      /**
+       * A device came online here, or went offline. Not called while the process shuts down, as
+       * its devices reconnect elsewhere. Must not throw.
+       */
+      onPresence?: (device: { id: string; userId: string }, online: boolean) => void;
+      /** A device reported which model providers it signs in to. Must not throw. */
+      onModels?: (device: { id: string; userId: string }) => void;
     },
   ) {
     this.address = deps.address;
@@ -336,6 +369,7 @@ export class UserDeviceHub {
     if (current?.revokedAt) this.disconnect(device.id, revokeReason(current.revokedBy));
     else if (current && (await revokeSignedOut(this.deps.prisma, [current])).length)
       this.disconnect(device.id, "session-ended");
+    else if (this.live.get(device.id) === entry) this.deps.onPresence?.(device, true);
     return connectionId;
   }
 
@@ -346,23 +380,30 @@ export class UserDeviceHub {
     );
   }
 
-  /** Raw HostComputerFrame values from the device for one request. */
+  /** Raw HostComputerFrame values from the device for one request or agent turn. */
   async *frames(
     route: UserDeviceRoute,
-    request: HostComputerRequest,
+    outgoing: UserDeviceOutgoing,
     signal: AbortSignal,
+    id: string = randomUUID(),
   ): AsyncIterable<unknown> {
     const entry = this.live.get(route.deviceId);
     if (!entry || !this.holds(route)) throw new UserDeviceOfflineError();
     signal.throwIfAborted();
-    const id = randomUUID();
+    if (entry.pending.has(id)) throw new Error("Duplicate request to your computer");
     const queue = new FrameQueue();
     entry.pending.set(id, queue);
     const abort = () => queue.fail(signal.reason);
     signal.addEventListener("abort", abort, { once: true });
     let finished = false;
     try {
-      entry.socket.send(JSON.stringify({ type: "request", id, request }));
+      entry.socket.send(
+        JSON.stringify(
+          "agent" in outgoing
+            ? { type: "agent", id, run: outgoing.agent }
+            : { type: "request", id, request: outgoing.request },
+        ),
+      );
       for await (const frame of queue) {
         if (isTerminal(frame)) finished = true;
         yield frame;
@@ -382,12 +423,30 @@ export class UserDeviceHub {
     }
   }
 
+  /** Answers one call an agent turn on the device made. False when this process lost the device. */
+  reply(
+    route: UserDeviceRoute,
+    id: string,
+    callId: string,
+    outcome: { value?: unknown; error?: string },
+  ): boolean {
+    const entry = this.live.get(route.deviceId);
+    if (!entry || !this.holds(route) || !entry.pending.has(id)) return false;
+    entry.socket.send(JSON.stringify({ type: "reply", id, callId, ...outcome }));
+    return true;
+  }
+
   /** NDJSON stream of frames for a forwarded request; a failure becomes an error frame. */
-  stream(route: UserDeviceRoute, request: HostComputerRequest, signal: AbortSignal): Response {
+  stream(
+    route: UserDeviceRoute,
+    outgoing: UserDeviceOutgoing,
+    signal: AbortSignal,
+    id?: string,
+  ): Response {
     if (!this.holds(route)) return new Response(null, { status: 409 });
     const controller = new AbortController();
     const linked = AbortSignal.any([signal, controller.signal]);
-    const iterator = this.frames(route, request, linked)[Symbol.asyncIterator]();
+    const iterator = this.frames(route, outgoing, linked, id)[Symbol.asyncIterator]();
     const encoder = new TextEncoder();
     const body = new ReadableStream<Uint8Array>({
       async pull(stream) {
@@ -448,7 +507,25 @@ export class UserDeviceHub {
     }
     const message = userDeviceClientMessage.safeParse(parsed);
     if (!message.success) return;
+    if (message.data.type === "models") {
+      void this.recordModels(entry, message.data.providers);
+      return;
+    }
     entry.pending.get(message.data.id)?.push(message.data.frame, text.length);
+  }
+
+  private async recordModels(entry: LiveDevice, providers: string[]) {
+    const { device } = entry;
+    await bestEffort(
+      "record a user device's model providers",
+      runAsSystem("record a user device's model providers", () =>
+        this.deps.prisma.userDevice.update({
+          where: { id: device.id },
+          data: { modelProviders: [...new Set(providers)] },
+        }),
+      ),
+    );
+    if (this.live.get(device.id) === entry) this.deps.onModels?.(device);
   }
 
   /** Forgets a connection and fails its requests; without a close code the socket is dead and is terminated. */
@@ -462,11 +539,17 @@ export class UserDeviceHub {
     } catch {
       entry.socket.terminate();
     }
+    // A newer socket for the device replaced this one, so it is still online.
+    const wentOffline = !this.closed && !this.live.has(entry.device.id);
     void runAsSystem("forget a user device connection", () =>
       this.deps.prisma.userDeviceConnection.deleteMany({
         where: { connectionId: entry.connectionId },
       }),
-    ).catch((error) => getLogger().warn("user device connection cleanup failed", { error }));
+    )
+      .catch((error) => getLogger().warn("user device connection cleanup failed", { error }))
+      .finally(() => {
+        if (wentOffline) this.deps.onPresence?.(entry.device, false);
+      });
   }
 
   private async heartbeat() {
@@ -521,7 +604,7 @@ export class UserDeviceHub {
  * Reaches the requesting user's connected device from any API or worker process: directly when
  * this process holds the socket, otherwise over internal HTTP to the process that does.
  */
-export class UserDevices implements UserDeviceGateway {
+export class UserDevices implements UserDeviceGateway, UserDeviceAgentLink {
   private readonly fetch: typeof fetch;
 
   constructor(
@@ -563,6 +646,7 @@ export class UserDevices implements UserDeviceGateway {
         select: {
           id: true,
           name: true,
+          modelProviders: true,
           connections: {
             where: { heartbeatAt: { gt: new Date(Date.now() - STALE_AFTER_MS) } },
             select: { deviceId: true },
@@ -574,6 +658,7 @@ export class UserDevices implements UserDeviceGateway {
       deviceId: device.id,
       name: device.name,
       connected: device.connections.length > 0,
+      modelProviders: device.modelProviders,
     }));
   }
 
@@ -605,9 +690,52 @@ export class UserDevices implements UserDeviceGateway {
     ]);
     const target = { deviceId: route.deviceId, userId, connectionId: route.connectionId };
     const frames = this.deps.hub?.holds(target)
-      ? this.deps.hub.frames(target, request, deadline)
-      : this.forward(route.address, target, request, deadline);
+      ? this.deps.hub.frames(target, { request }, deadline)
+      : this.forward(route.address, target, { request }, deadline);
     yield* framesToValues<T>(frames, deadline);
+  }
+
+  /**
+   * Runs one agent turn on the user's device. It lasts as long as the turn, until `signal`
+   * aborts or the device goes away; the device's heartbeats keep a long tool call alive.
+   */
+  async agentSession(
+    userId: string,
+    deviceId: string,
+    run: UserDeviceAgentRun,
+    signal: AbortSignal,
+  ): Promise<UserDeviceAgentSession> {
+    if (Buffer.byteLength(JSON.stringify(run)) > HOST_COMPUTER_MAX_BYTES)
+      throw new Error("This turn is too large to send to your computer");
+    const route = await this.route(userId, deviceId);
+    if (!route) throw new UserDeviceOfflineError();
+    const id = randomUUID();
+    const target = { deviceId: route.deviceId, userId, connectionId: route.connectionId };
+    const local = this.deps.hub?.holds(target) ? this.deps.hub : undefined;
+    const frames = local
+      ? local.frames(target, { agent: run }, signal, id)
+      : this.forward(route.address, target, { agent: run }, signal, id);
+    return {
+      frames: agentFrames(frames, signal),
+      reply: async (callId, outcome) => {
+        if (local) {
+          if (!local.reply(target, id, callId, outcome)) throw new UserDeviceOfflineError();
+          return;
+        }
+        const response = await this.fetch(new URL(USER_DEVICE_REPLY_PATH, route.address), {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${this.deps.forwardSecret}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ ...target, id, callId, ...outcome }),
+          redirect: "error",
+          signal,
+        });
+        await response.body?.cancel();
+        if (!response.ok) throw new UserDeviceOfflineError();
+      },
+    };
   }
 
   /** Closes the device's socket wherever it is held. Best effort; heartbeats close it otherwise. */
@@ -656,8 +784,9 @@ export class UserDevices implements UserDeviceGateway {
   private async *forward(
     address: string,
     route: UserDeviceRoute,
-    request: HostComputerRequest,
+    outgoing: UserDeviceOutgoing,
     signal: AbortSignal,
+    id?: string,
   ): AsyncIterable<unknown> {
     let response: Response;
     try {
@@ -667,7 +796,7 @@ export class UserDevices implements UserDeviceGateway {
           authorization: `Bearer ${this.deps.forwardSecret}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify({ ...route, request }),
+        body: JSON.stringify({ ...route, ...outgoing, ...(id ? { id } : {}) }),
         signal,
         redirect: "error",
       });
@@ -689,12 +818,54 @@ export const userDeviceDisconnectBody = z.object({
   reason: userDeviceRevokeReason.optional(),
 });
 
-export const userDeviceForwardBody = z.object({
+const forwardRoute = {
   deviceId: z.string().min(1).max(64),
   userId: z.string().min(1).max(128),
   connectionId: z.string().min(1).max(64),
-  request: hostComputerRequest,
+};
+
+export const userDeviceForwardBody = z.union([
+  z.object({ ...forwardRoute, request: hostComputerRequest }),
+  z.object({ ...forwardRoute, id: z.string().min(1).max(64), agent: userDeviceAgentRun }),
+]);
+
+/** Body of a forwarded answer to an agent turn's call. */
+export const userDeviceReplyBody = z.object({
+  ...forwardRoute,
+  id: z.string().min(1).max(64),
+  callId: z.string().min(1).max(64),
+  value: z.unknown().optional(),
+  error: z.string().optional(),
 });
+
+/** What the server sends a device: a computer request, or one agent turn. */
+export type UserDeviceOutgoing = { request: HostComputerRequest } | { agent: UserDeviceAgentRun };
+
+/** An agent turn's frames: its runtime events, `{ call }` asks, and its end. */
+export type UserDeviceAgentFrame = { event: unknown } | { call: UserDeviceAgentCall };
+
+async function* agentFrames(
+  frames: AsyncIterable<unknown>,
+  signal: AbortSignal,
+): AsyncIterable<UserDeviceAgentFrame> {
+  for await (const raw of frames) {
+    signal.throwIfAborted();
+    if (raw && typeof raw === "object" && "call" in raw) {
+      const call = userDeviceAgentCall.safeParse((raw as { call: unknown }).call);
+      if (!call.success) throw new Error("Your computer sent an invalid response");
+      yield { call: call.data };
+      continue;
+    }
+    const frame = hostFrame<unknown>(raw);
+    if (!frame) throw new Error("Your computer sent an invalid response");
+    if ("error" in frame) throw new Error(frame.error);
+    if ("heartbeat" in frame) continue;
+    if ("done" in frame) return;
+    yield { event: frame.value };
+  }
+  signal.throwIfAborted();
+  throw new Error(DISCONNECTED_MESSAGE);
+}
 
 async function* framesToValues<T>(
   frames: AsyncIterable<unknown>,
@@ -724,6 +895,7 @@ function hostFrame<T>(value: unknown): HostComputerFrame<T> | null {
 }
 
 function isTerminal(frame: unknown) {
+  if (frame && typeof frame === "object" && "call" in frame) return false;
   const parsed = hostFrame(frame);
   return !parsed || "error" in parsed || "done" in parsed;
 }

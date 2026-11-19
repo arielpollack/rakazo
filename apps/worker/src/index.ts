@@ -191,6 +191,11 @@ async function main() {
     inMemoryJobs ?? new RunJobPublisher(prisma, new GraphileJobPublisher(pool, prisma), runs);
   secretCleanupJobs = jobs;
   const connectors = createConnectorRuntime(env, { prisma, secrets, events, jobs });
+  // Device sockets live in an API process; the worker forwards to whichever one holds it.
+  const userDevices =
+    process.env.USER_DEVICES_ENABLED === "false"
+      ? undefined
+      : new UserDevices({ prisma, forwardSecret: userDeviceForwardSecret(env.encryptionKey) });
   const sandbox = await createRunSandbox(sandboxProvider, {
     ...sandboxOptions,
     supervisorUrl: process.env.SANDBOX_SUPERVISOR_URL ?? "http://127.0.0.1:7091",
@@ -199,6 +204,7 @@ async function main() {
     prisma,
     secrets,
     unreferencedMachines: machineCleanupRecords(jobs),
+    userDevices,
   });
   const { messaging, installations: messagingInstallations } = installedMessaging(
     prisma,
@@ -289,6 +295,7 @@ async function main() {
       meetingCalendar && (({ connectionId }) => meetingCalendar.sync(connectionId)),
     prisma,
     runtime,
+    userDeviceAgents: userDevices,
     // Live per-account Codex catalog; never refreshes or writes credentials.
     codexCatalog: new CodexCatalogCache(),
     sandbox,
@@ -309,21 +316,12 @@ async function main() {
       ? (id: string) => messagingInstallations.isActive(id)
       : undefined,
     cloudAgent,
-    // Device sockets live in an API process; the worker forwards to whichever one holds it.
-    userDevices: withHostComputerScreen(
-      process.env.USER_DEVICES_ENABLED === "false"
-        ? undefined
-        : new UserDevices({
-            prisma,
-            forwardSecret: userDeviceForwardSecret(env.encryptionKey),
-          }),
-      {
-        prisma,
-        sandboxKind: sandboxProvider,
-        url: sandboxOptions.hostComputerUrl,
-        token: sandboxOptions.hostComputerToken,
-      },
-    ),
+    userDevices: withHostComputerScreen(userDevices, {
+      prisma,
+      sandboxKind: sandboxProvider,
+      url: sandboxOptions.hostComputerUrl,
+      token: sandboxOptions.hostComputerToken,
+    }),
     paymentWallet,
     stoppingSignal: shutdown.signal,
     shutdownSignal: runDrain.signal,

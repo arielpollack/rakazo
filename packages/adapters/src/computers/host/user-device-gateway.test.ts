@@ -16,12 +16,14 @@ import {
   hashUserDeviceToken,
   USER_DEVICE_FORWARD_PATH,
   USER_DEVICE_OFFLINE_MESSAGE,
+  USER_DEVICE_REPLY_PATH,
   UserDeviceHub,
   UserDevices,
   userDeviceBearer,
   userDeviceForwardBody,
   userDeviceForwardSecret,
   userDeviceInternalAddress,
+  userDeviceReplyBody,
   validUserDeviceForwardSecret,
 } from "./user-device-gateway.js";
 
@@ -34,6 +36,7 @@ interface DeviceRow {
   createdAt?: Date;
   revokedAt: Date | null;
   lastSeenAt: Date | null;
+  modelProviders?: string[];
 }
 interface ConnectionRow {
   deviceId: string;
@@ -146,6 +149,47 @@ class FakeSocket extends EventEmitter implements UserDeviceSocket {
   reply(id: string, frame: unknown) {
     this.emit("message", Buffer.from(JSON.stringify({ type: "frame", id, frame })));
   }
+  /** Device side: the next message of this type the server sent. */
+  async next<T>(type: string): Promise<T> {
+    while (true) {
+      const message = this.sent.find((entry) => entry.type === type && !entry.seen);
+      if (message) {
+        message.seen = true;
+        return message as T;
+      }
+      await once(this, "sent");
+    }
+  }
+}
+
+const agentRun = { botId: "bot-1", runId: "run-1", request: { prompt: "hi" } };
+
+/** Device side of one agent turn: ask for a tool, take the server's answer, then finish. */
+async function deviceTurn(socket: FakeSocket) {
+  const { id, run } = await socket.next<{ id: string; run: typeof agentRun }>("agent");
+  socket.reply(id, { call: { id: "call-1", name: "executeTool", args: ["shell", {}, "e1"] } });
+  const answer = await socket.next<{ id: string; callId: string; value: unknown }>("reply");
+  socket.reply(id, { heartbeat: true });
+  socket.reply(id, { value: { type: "text", text: `got ${JSON.stringify(answer.value)}` } });
+  socket.reply(id, { done: true });
+  return { id, run, answer };
+}
+
+async function serverTurn(devices: UserDevices) {
+  const session = await devices.agentSession(
+    "user-1",
+    device.id,
+    agentRun,
+    new AbortController().signal,
+  );
+  const seen: unknown[] = [];
+  for await (const frame of session.frames) {
+    if ("call" in frame) {
+      seen.push(frame.call);
+      await session.reply(frame.call.id, { value: "Darwin" });
+    } else seen.push(frame.event);
+  }
+  return seen;
 }
 
 const device = { id: "device-1", userId: "user-1", name: "Laptop", platform: "darwin" };
@@ -153,7 +197,10 @@ const environment: HostComputerRequest = { method: "environment", botId: "bot-1"
 const secret = userDeviceForwardSecret("test-encryption-key");
 const hubs: UserDeviceHub[] = [];
 
-function setup() {
+function setup(
+  onPresence?: (device: { id: string }, online: boolean) => void,
+  onModels?: (device: { id: string }) => void,
+) {
   const db = fakePrisma();
   db.deviceRows.set(device.id, {
     ...device,
@@ -162,7 +209,12 @@ function setup() {
     revokedAt: null,
     lastSeenAt: null,
   });
-  const hub = new UserDeviceHub({ prisma: db.prisma, address: "http://10.0.0.5:3100" });
+  const hub = new UserDeviceHub({
+    prisma: db.prisma,
+    address: "http://10.0.0.5:3100",
+    onPresence,
+    onModels,
+  });
   hubs.push(hub);
   const devices = new UserDevices({ prisma: db.prisma, forwardSecret: secret, hub });
   return { ...db, hub, devices };
@@ -310,6 +362,54 @@ describe("user device gateway in the holding process", () => {
     await expect(result).resolves.toEqual([1]);
   });
 
+  it("reports a device online and offline, but not when a newer socket replaces it", async () => {
+    const presence: Array<[string, boolean]> = [];
+    const { hub } = setup((entry, online) => presence.push([entry.id, online]));
+    const first = new FakeSocket();
+    await hub.attach(device, first);
+    await hub.attach(device, new FakeSocket());
+    await vi.waitFor(() => expect(first.closed?.code).toBe(4000));
+    expect(presence).toEqual([
+      ["device-1", true],
+      ["device-1", true],
+    ]);
+    hub.disconnect(device.id);
+    await vi.waitFor(() => expect(presence.at(-1)).toEqual(["device-1", false]));
+    expect(presence).toHaveLength(3);
+  });
+
+  it("records the model providers a device reports and says it changed", async () => {
+    const changed: string[] = [];
+    const { hub, deviceRows } = setup(undefined, (entry) => changed.push(entry.id));
+    const socket = new FakeSocket();
+    await hub.attach(device, socket);
+    const report = { type: "models", providers: ["google-vertex", "cli", "cli"] };
+    socket.emit("message", Buffer.from(JSON.stringify(report)));
+    await vi.waitFor(() => expect(changed).toEqual(["device-1"]));
+    expect(deviceRows.get(device.id)?.modelProviders).toEqual(["google-vertex", "cli"]);
+  });
+
+  it("does not report devices offline while the process shuts down", async () => {
+    const presence: boolean[] = [];
+    const { hub } = setup((_, online) => presence.push(online));
+    await hub.attach(device, new FakeSocket());
+    await hub.close();
+    expect(presence).toEqual([true]);
+  });
+
+  it("runs an agent turn on the device and answers the calls it makes", async () => {
+    const { hub, devices } = setup();
+    const socket = new FakeSocket();
+    await hub.attach(device, socket);
+    const [seen, turn] = await Promise.all([serverTurn(devices), deviceTurn(socket)]);
+    expect(turn.run).toEqual(agentRun);
+    expect(turn.answer).toMatchObject({ id: turn.id, callId: "call-1", value: "Darwin" });
+    expect(seen).toEqual([
+      { id: "call-1", name: "executeTool", args: ["shell", {}, "e1"] },
+      { type: "text", text: 'got "Darwin"' },
+    ]);
+  });
+
   it("closes the socket and fails requests on revoke", async () => {
     const { hub, devices } = setup();
     const socket = new FakeSocket();
@@ -369,9 +469,23 @@ describe("user device gateway from another process", () => {
     const fetcher = (async (input: URL | string, init?: RequestInit) => {
       const headers = new Headers(init?.headers);
       calls.push({ url: String(input), authorization: headers.get("authorization") });
-      const body = userDeviceForwardBody.parse(JSON.parse(String(init?.body)));
-      const { request, ...route } = body;
-      return hub.stream(route, request, init?.signal ?? new AbortController().signal);
+      const json = JSON.parse(String(init?.body));
+      const signal = init?.signal ?? new AbortController().signal;
+      if (String(input).endsWith(USER_DEVICE_REPLY_PATH)) {
+        const { id, callId, value, error, ...route } = userDeviceReplyBody.parse(json);
+        return new Response(null, {
+          status: hub.reply(route, id, callId, { value, error }) ? 204 : 409,
+        });
+      }
+      const body = userDeviceForwardBody.parse(json);
+      const route = {
+        deviceId: body.deviceId,
+        userId: body.userId,
+        connectionId: body.connectionId,
+      };
+      return "agent" in body
+        ? hub.stream(route, { agent: body.agent }, signal, body.id)
+        : hub.stream(route, { request: body.request }, signal);
     }) as typeof fetch;
     return { calls, fetcher };
   }
@@ -391,6 +505,21 @@ describe("user device gateway from another process", () => {
     await expect(result).resolves.toEqual(["a", "b"]);
     expect(calls).toEqual([
       { url: `http://10.0.0.5:3100${USER_DEVICE_FORWARD_PATH}`, authorization: `Bearer ${secret}` },
+    ]);
+  });
+
+  it("runs an agent turn forwarded from another process, replies included", async () => {
+    const { hub, prisma } = setup();
+    const socket = new FakeSocket();
+    await hub.attach(device, socket);
+    const { calls, fetcher } = forwarding(hub);
+    const worker = new UserDevices({ prisma, forwardSecret: secret, fetch: fetcher });
+    const [seen, turn] = await Promise.all([serverTurn(worker), deviceTurn(socket)]);
+    expect(turn.answer).toMatchObject({ callId: "call-1", value: "Darwin" });
+    expect(seen.at(-1)).toEqual({ type: "text", text: 'got "Darwin"' });
+    expect(calls.map((call) => call.url)).toEqual([
+      `http://10.0.0.5:3100${USER_DEVICE_FORWARD_PATH}`,
+      `http://10.0.0.5:3100${USER_DEVICE_REPLY_PATH}`,
     ]);
   });
 
@@ -456,7 +585,7 @@ describe("user device gateway from another process", () => {
     await hub.attach(device, new FakeSocket());
     const response = hub.stream(
       { deviceId: device.id, userId: "user-2", connectionId: "x" },
-      environment,
+      { request: environment },
       new AbortController().signal,
     );
     expect(response.status).toBe(409);

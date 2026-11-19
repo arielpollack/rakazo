@@ -32,9 +32,17 @@ export const exclude = [
 ];
 
 // Provider ids that are also ordinary words or name no vendor. A match outside adapters is
-// rarely a vendor reference, so they are not checked: "none", "fake", "desktop" and "local-vm" are plain
-// English, and Docker is the runtime self-hosting itself is built on.
-const UNCHECKED_COMPUTER_IDS = new Set(["none", "fake", "desktop", "docker", "local-vm"]);
+// rarely a vendor reference, so they are not checked: "none", "fake", "desktop", "local-vm" and
+// "user-device" (a person's own paired computer) are plain English, and Docker is the runtime
+// self-hosting itself is built on.
+const UNCHECKED_COMPUTER_IDS = new Set([
+  "none",
+  "fake",
+  "desktop",
+  "docker",
+  "local-vm",
+  "user-device",
+]);
 
 // Every computer provider registers its descriptor under its id, so a new one is checked from
 // the pull request that adds it.

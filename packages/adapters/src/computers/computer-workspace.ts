@@ -370,6 +370,8 @@ export async function checkpointComputerWorkspace(
   /** Defaults to the home store's configured limits. */
   saveLimits: WorkspaceExportLimits = home.saveLimits ?? WORKSPACE_SAVE_LIMITS,
 ): Promise<string | undefined> {
+  // The home lives on its machine alone; there is no server copy to save.
+  if (sandboxKindCapabilities(computer.kind).homeStaysOnMachine) return undefined;
   // A machine whose restore never finished holds only part of the home: save nothing from it,
   // nor while a start that may still replace or restore it is under way. Every later start moves
   // the row into booting, which changes its screen generation, so one that began or even

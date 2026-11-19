@@ -23,6 +23,7 @@ import {
   releaseComputerExecutionLease,
   renewComputerExecutionLease,
 } from "../../computers/computer-lifecycle.js";
+import { onlineUserDevices } from "../../computers/host/user-device-gateway.js";
 import { lateRoutineRunDueAt } from "../../routines/routine-lateness.js";
 import type {
   RunComputerUseState,
@@ -158,7 +159,7 @@ async function startClaimedAttempt(
     select: {
       computerId: true,
       computerSwitching: true,
-      computer: { select: { scope: true } },
+      computer: { select: { scope: true, deviceId: true } },
     },
   });
   if (!leaseTarget.computerId) throw new Error("Bot has no computer");
@@ -166,6 +167,29 @@ async function startClaimedAttempt(
   const needsComputerNow = heldForTakeover || Boolean(takeoverResume);
   if (leaseTarget.computerSwitching) {
     await requeueComputerRun(deps, runId, workerId, fence, resumeCheckpoint, heldForTakeover);
+    return;
+  }
+  // A bot on its owner's device waits, without a retry timer, until that device connects.
+  const deviceId = leaseTarget.computer?.deviceId;
+  const deviceOnline = async () =>
+    !deviceId || (await onlineUserDevices(deps.prisma, [deviceId])).has(deviceId);
+  if (!(await deviceOnline())) {
+    await requeueComputerRun(deps, runId, workerId, fence, resumeCheckpoint, heldForTakeover, true);
+    // A device that connected meanwhile found no waiting run to start.
+    if (await deviceOnline()) await wakeRun(deps.jobs, runId);
+    // Viewers saw it claimed; this tells them to read it again, now waiting.
+    else
+      await bestEffort(
+        "say a run waits for its computer",
+        deps.events.append({
+          spaceId: run.spaceId,
+          threadId: run.threadId,
+          botId: run.botId,
+          runId,
+          type: "thread.meta",
+          payload: { waitingFor: "computer" },
+        }),
+      );
     return;
   }
   if (takeoverResume) {

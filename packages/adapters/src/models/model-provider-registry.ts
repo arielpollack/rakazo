@@ -92,7 +92,8 @@ export const modelProviders = {
   },
   "google-vertex": {
     recommendedModel: "gemini-4-hydrogen",
-    hostCredentials: { source: "Google Cloud" },
+    // Application Default Credentials, including the metadata server, resolve at request time.
+    hostCredentials: { source: "Google Cloud", resolvedAtRequest: true },
     routingFields: ["projectId", "region"],
   },
   // Retired, answered with "does not exist" / "no longer available".

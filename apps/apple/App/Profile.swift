@@ -138,7 +138,11 @@ struct Profile: View {
           Button("Computer access…") { hostOpen = true }
         #endif
       } else {
-        Notice(symbol: "desktopcomputer", title: computer?.state.capitalized ?? "Computer", detail: (computer?.mode ?? chat.computerMode)?.capitalized)
+        if offersRunsOn { RunsOnBox(store: store, chat: chat, devices: store.devices) }
+        // A bot on a paired computer has no server computer to describe.
+        if chat.computerDeviceId == nil {
+          Notice(symbol: "desktopcomputer", title: computer?.state.capitalized ?? "Computer", detail: (computer?.mode ?? chat.computerMode)?.capitalized)
+        }
         webLink("Open computer in Rakazo ↗")
       }
     case "Members":
@@ -161,6 +165,14 @@ struct Profile: View {
         webLink("Manage bot on the web ↗")
       }.padding(10)
     }
+  }
+  /// A paired computer can take the bot; on a Mac, so can this one once allowed.
+  private var offersRunsOn: Bool {
+    #if os(macOS)
+      return store.client != nil
+    #else
+      return !store.devices.isEmpty
+    #endif
   }
   @ViewBuilder func webLink(_ title: String) -> some View {
     if let url = store.link(chat) { Link(title, destination: url).font(.callout) }

@@ -40,6 +40,19 @@ const PASSTHROUGH_ENV = new Set([
   "XDG_RUNTIME_DIR",
   // Set only by an operator who keeps the CLI's sign-in somewhere other than its default.
   "CLAUDE_CONFIG_DIR",
+  // Which cloud the CLI signs in through, and where. Names and places, never a key: the
+  // credentials stay in the cloud's own sign-in files.
+  "CLAUDE_CODE_USE_VERTEX",
+  "CLAUDE_CODE_USE_BEDROCK",
+  "ANTHROPIC_VERTEX_PROJECT_ID",
+  "CLOUD_ML_REGION",
+  "GOOGLE_APPLICATION_CREDENTIALS",
+  "AWS_PROFILE",
+  "AWS_REGION",
+  "AWS_DEFAULT_REGION",
+  "ANTHROPIC_DEFAULT_OPUS_MODEL",
+  "ANTHROPIC_DEFAULT_SONNET_MODEL",
+  "ANTHROPIC_DEFAULT_HAIKU_MODEL",
   "HTTP_PROXY",
   "HTTPS_PROXY",
   "NO_PROXY",
